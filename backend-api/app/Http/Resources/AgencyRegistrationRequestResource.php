@@ -1,0 +1,44 @@
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class AgencyRegistrationRequestResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'company' => $this->company,
+            'email' => $this->email,
+            'phone' => $this->phone,
+            'city' => $this->city,
+            'activity' => $this->activity,
+            'manager_name' => $this->manager_name,
+            'district' => $this->district,
+            'address' => $this->address,
+            'ninea' => $this->ninea,
+            'color' => $this->color,
+            'logo_url' => $this->logo_url,
+            'status' => $this->status,
+            'is_read' => $this->read_at !== null,
+            'documents' => collect($this->documents ?? [])->map(function (array $document, int $index): array {
+                return [
+                    'id' => $index,
+                    'name' => $document['name'] ?? 'document',
+                    'mime_type' => $document['mime_type'] ?? 'application/octet-stream',
+                    'size' => $document['size'] ?? 0,
+                    'download_url' => route('agency-registration-requests.documents.download', [
+                        'agencyRegistrationRequest' => $this->id,
+                        'documentIndex' => $index,
+                    ]),
+                ];
+            })->values(),
+            'created_at' => $this->created_at,
+            'read_at' => $this->read_at,
+            'reviewed_at' => $this->reviewed_at,
+        ];
+    }
+}
