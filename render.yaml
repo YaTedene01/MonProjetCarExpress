@@ -1,0 +1,69 @@
+services:
+  - type: web
+    name: carexpress-api
+    runtime: docker
+    rootDir: backend-api
+    dockerfilePath: ./Dockerfile
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /up
+    envVars:
+      - key: APP_NAME
+        value: Car Express API
+      - key: APP_KEY
+        generateValue: true
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_URL
+        value: https://carexpress-api.onrender.com
+      - key: L5_SWAGGER_CONST_HOST
+        value: https://carexpress-api.onrender.com
+      - key: PORT
+        value: "10000"
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromDatabase:
+          name: carexpress-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: carexpress-db
+          property: port
+      - key: DB_DATABASE
+        fromDatabase:
+          name: carexpress-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: carexpress-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: carexpress-db
+          property: password
+      - key: DB_SSLMODE
+        value: require
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://carexpress-web.onrender.com
+      - key: SANCTUM_STATEFUL_DOMAINS
+        value: carexpress-web.onrender.com
+
+  - type: static
+    name: carexpress-web
+    rootDir: carexpress-react
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: false
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://carexpress-api.onrender.com
+
+databases:
+  - name: carexpress-db
+    databaseName: carexpress
+    plan: free
