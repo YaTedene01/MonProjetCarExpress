@@ -195,78 +195,63 @@ function LocationScreen({ view, setView, onOpenDetail, locVehicles, onFilterChan
         accent={S.loc}
       />
 
-      <div style={dashboardGrid()}>
-        <Panel title="Planifier une location" subtitle="Lieu, dates, horaires et remise a zero du formulaire">
-          <div style={rentalFormShellStyle()}>
-            <div style={rentalFormHeroStyle()}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
-                <div style={{ maxWidth: 520 }}>
-                  <div style={rentalEyebrowStyle()}>Reservation rapide</div>
-                  <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800, color: S.text, lineHeight: 1.04 }}>
-                    Préparez votre location en quelques informations
-                  </div>
-                  <div style={{ marginTop: 10, color: S.text2, fontSize: 14, lineHeight: 1.7 }}>
-                    Choisissez le lieu, les dates et les horaires pour afficher des vehicules adaptes a votre besoin.
-                  </div>
+      <Panel title="Planifier une location" subtitle="Lieu, dates, horaires et remise a zero du formulaire">
+        <div style={rentalFormShellStyle()}>
+          <div style={rentalFormHeroStyle()}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
+              <div style={{ maxWidth: 520 }}>
+                <div style={rentalEyebrowStyle()}>Reservation rapide</div>
+                <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800, color: S.text, lineHeight: 1.04 }}>
+                  Préparez votre location en quelques informations
                 </div>
-                <div style={rentalStatBadgeStyle()}>
-                  <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.14em", opacity: 0.82 }}>Parcours</span>
-                  <strong style={{ fontSize: 16 }}>Location Car Express</strong>
+                <div style={{ marginTop: 10, color: S.text2, fontSize: 14, lineHeight: 1.7 }}>
+                  Choisissez le lieu, les dates et les horaires pour afficher des vehicules adaptes a votre besoin.
                 </div>
               </div>
-              <div style={rentalMiniInfoGridStyle(isMobile)}>
-                <MiniInfoCard label="Prise en charge" value={lieu || "A definir"} />
-                <MiniInfoCard label="Depart" value={depDate ? `${depDate} · ${depH}` : "Non renseigne"} />
-                <MiniInfoCard label="Retour" value={retDate ? `${retDate} · ${retH}` : "Non renseigne"} />
+              <div style={rentalStatBadgeStyle()}>
+                <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.14em", opacity: 0.82 }}>Parcours</span>
+                <strong style={{ fontSize: 16 }}>Location Car Express</strong>
               </div>
             </div>
+            <div style={rentalMiniInfoGridStyle(isMobile)}>
+              <MiniInfoCard label="Prise en charge" value={lieu || "A definir"} />
+              <MiniInfoCard label="Depart" value={depDate ? `${depDate} · ${depH}` : "Non renseigne"} />
+              <MiniInfoCard label="Retour" value={retDate ? `${retDate} · ${retH}` : "Non renseigne"} />
+            </div>
+          </div>
 
-            <div style={{ display: "grid", gap: 14 }}>
-              <Field label="Lieu de prise en charge" hint="Ville, aeroport ou adresse de remise">
-                <input value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Ville, aeroport ou adresse" style={inputStyle("text")} />
+          <div style={{ display: "grid", gap: 14 }}>
+            <Field label="Lieu de prise en charge" hint="Ville, aeroport ou adresse de remise">
+              <input value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Ville, aeroport ou adresse" style={inputStyle("text")} />
+            </Field>
+            <div style={formGrid(isMobile)}>
+              <Field label="Date depart" hint="Jour de debut de votre reservation">
+                <input type="date" value={depDate} onChange={(e) => setDepDate(e.target.value)} style={inputStyle("date")} />
               </Field>
-              <div style={formGrid(isMobile)}>
-                <Field label="Date depart" hint="Jour de debut de votre reservation">
-                  <input type="date" value={depDate} onChange={(e) => setDepDate(e.target.value)} style={inputStyle("date")} />
-                </Field>
-                <Field label="Heure depart" hint="Heure souhaitee pour recuperer le vehicule">
-                  <select value={depH} onChange={(e) => setDepH(e.target.value)} style={timeSelectStyle(isMobile)}>
-                    {heures.map((hour) => <option key={hour}>{hour}</option>)}
-                  </select>
-                </Field>
-              </div>
-              <div style={formGrid(isMobile)}>
-                <Field label="Date retour" hint="Jour de fin de votre reservation">
-                  <input type="date" value={retDate} onChange={(e) => setRetDate(e.target.value)} style={inputStyle("date")} />
-                </Field>
-                <Field label="Heure retour" hint="Heure prevue pour la restitution">
-                  <select value={retH} onChange={(e) => setRetH(e.target.value)} style={timeSelectStyle(isMobile)}>
-                    {heures.map((hour) => <option key={hour}>{hour}</option>)}
-                  </select>
-                </Field>
-              </div>
+              <Field label="Heure depart" hint="Heure souhaitee pour recuperer le vehicule">
+                <select value={depH} onChange={(e) => setDepH(e.target.value)} style={timeSelectStyle(isMobile)}>
+                  {heures.map((hour) => <option key={hour}>{hour}</option>)}
+                </select>
+              </Field>
             </div>
-
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 2 }}>
-              <Btn accent={S.loc}>Rechercher</Btn>
-              <Btn outline accent={S.loc} onClick={reset}>Reinitialiser</Btn>
+            <div style={formGrid(isMobile)}>
+              <Field label="Date retour" hint="Jour de fin de votre reservation">
+                <input type="date" value={retDate} onChange={(e) => setRetDate(e.target.value)} style={inputStyle("date")} />
+              </Field>
+              <Field label="Heure retour" hint="Heure prevue pour la restitution">
+                <select value={retH} onChange={(e) => setRetH(e.target.value)} style={timeSelectStyle(isMobile)}>
+                  {heures.map((hour) => <option key={hour}>{hour}</option>)}
+                </select>
+              </Field>
             </div>
           </div>
-        </Panel>
 
-        <Panel title="Ce que vous pouvez faire" subtitle="La fiche detail vous permet ensuite de continuer la reservation">
-          <div style={{ display: "grid", gap: 10 }}>
-            {[
-              "Consulter la galerie, les caracteristiques techniques, les equipements et les avis.",
-              "Verifier la disponibilite selon les dates choisies.",
-              "Calculer automatiquement le nombre de jours et le total de location.",
-              "Finaliser avec vos informations, les conditions et le mode de paiement.",
-            ].map((item) => (
-              <InfoRow key={item} tone="red">{item}</InfoRow>
-            ))}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 2 }}>
+            <Btn accent={S.loc}>Rechercher</Btn>
+            <Btn outline accent={S.loc} onClick={reset}>Reinitialiser</Btn>
           </div>
-        </Panel>
-      </div>
+        </div>
+      </Panel>
 
       <Panel title="Filtres visuels" subtitle="Marque, sieges, motorisation, transmission, categorie, classe et prix">
         <FilterPanel prefix="loc" accent={S.loc} onApply={onFilterChange} />
@@ -302,22 +287,12 @@ function AchatScreen({ view, setView, onOpenDetail, vntVehicles, onFilterChange 
         accent={S.vnt}
       />
 
-      <div style={dashboardGrid()}>
-        <Panel title="Recherche achat" subtitle="Marque, modele ou annee">
-          <div style={{ display: "grid", gap: 12 }}>
-            <SearchBox placeholder="Marque, modele, annee..." value={query} onChange={setQuery} />
-            <Btn outline accent={S.vnt} onClick={() => setQuery("")}>Reinitialiser</Btn>
-          </div>
-        </Panel>
-
-        <Panel title="Informations dossier achat" subtitle="Fonctionnement du paiement dans l'application">
-          <div style={{ display: "grid", gap: 10 }}>
-            <InfoRow tone="gold">Le prix total du vehicule n'est pas encaisse par la plateforme.</InfoRow>
-            <InfoRow tone="gold">Seuls les frais de service Car Express sont payes dans l'application.</InfoRow>
-            <InfoRow tone="gold">Le client accepte les CGU, les conditions du concessionnaire et la clause non remboursable des frais de service.</InfoRow>
-          </div>
-        </Panel>
-      </div>
+      <Panel title="Recherche achat" subtitle="Marque, modele ou annee">
+        <div style={{ display: "grid", gap: 12 }}>
+          <SearchBox placeholder="Marque, modele, annee..." value={query} onChange={setQuery} />
+          <Btn outline accent={S.vnt} onClick={() => setQuery("")}>Reinitialiser</Btn>
+        </div>
+      </Panel>
 
       <Panel title="Filtres achat" subtitle="Affinez les annonces recentes et les vehicules en vente">
         <FilterPanel prefix="vnt" accent={S.vnt} onApply={onFilterChange} />
