@@ -197,26 +197,23 @@ function LocationScreen({ view, setView, onOpenDetail, locVehicles, onFilterChan
 
       <Panel title="Planifier une location" subtitle="Lieu, dates, horaires et remise a zero du formulaire">
         <div style={rentalFormShellStyle()}>
-          <div style={rentalFormHeroStyle()}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
-              <div style={{ maxWidth: 520 }}>
+          <div style={compactRentalHeaderStyle(isMobile)}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ maxWidth: 460 }}>
                 <div style={rentalEyebrowStyle()}>Reservation rapide</div>
-                <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800, color: S.text, lineHeight: 1.04 }}>
-                  Préparez votre location en quelques informations
-                </div>
-                <div style={{ marginTop: 10, color: S.text2, fontSize: 14, lineHeight: 1.7 }}>
-                  Choisissez le lieu, les dates et les horaires pour afficher des vehicules adaptes a votre besoin.
+                <div style={{ fontSize: isMobile ? 18 : 20, fontWeight: 800, color: S.text, lineHeight: 1.2 }}>
+                  Préparez votre location
                 </div>
               </div>
-              <div style={rentalStatBadgeStyle()}>
+              <div style={compactRentalBadgeStyle()}>
                 <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.14em", opacity: 0.82 }}>Parcours</span>
                 <strong style={{ fontSize: 16 }}>Location Car Express</strong>
               </div>
             </div>
-            <div style={rentalMiniInfoGridStyle(isMobile)}>
-              <MiniInfoCard label="Prise en charge" value={lieu || "A definir"} />
-              <MiniInfoCard label="Depart" value={depDate ? `${depDate} · ${depH}` : "Non renseigne"} />
-              <MiniInfoCard label="Retour" value={retDate ? `${retDate} · ${retH}` : "Non renseigne"} />
+            <div style={compactRentalSummaryStyle(isMobile)}>
+              <span>Prise en charge: <strong>{lieu || "A definir"}</strong></span>
+              <span>Depart: <strong>{depDate ? `${depDate} · ${depH}` : "Non renseigne"}</strong></span>
+              <span>Retour: <strong>{retDate ? `${retDate} · ${retH}` : "Non renseigne"}</strong></span>
             </div>
           </div>
 
@@ -290,7 +287,7 @@ function AchatScreen({ view, setView, onOpenDetail, vntVehicles, onFilterChange 
       <Panel title="Recherche achat" subtitle="Marque, modele ou annee">
         <div style={{ display: "grid", gap: 12 }}>
           <SearchBox placeholder="Marque, modele, annee..." value={query} onChange={setQuery} />
-          <Btn outline accent={S.vnt} onClick={() => setQuery("")}>Reinitialiser</Btn>
+          <Btn outline accent={S.vnt} small style={{ width: "fit-content", minWidth: 170 }} onClick={() => setQuery("")}>Reinitialiser</Btn>
         </div>
       </Panel>
 
@@ -683,9 +680,9 @@ function rentalStatBadgeStyle() {
 function compactRentalHeaderStyle(isMobile = false) {
   return {
     display: "grid",
-    gap: 12,
-    padding: isMobile ? "14px" : "16px 18px",
-    borderRadius: 22,
+    gap: 8,
+    padding: isMobile ? "12px" : "12px 14px",
+    borderRadius: 18,
     border: `1px solid rgba(212,5,17,0.12)`,
     background: "linear-gradient(135deg, rgba(255,245,245,0.96) 0%, rgba(255,255,255,0.96) 100%)",
   };
@@ -695,9 +692,22 @@ function compactRentalSummaryStyle(isMobile = false) {
   return {
     display: "grid",
     gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))",
-    gap: 8,
-    fontSize: 12,
+    gap: 6,
+    fontSize: 11,
     color: S.text2,
+  };
+}
+
+function compactRentalBadgeStyle() {
+  return {
+    minWidth: 150,
+    display: "grid",
+    gap: 4,
+    padding: "9px 12px",
+    borderRadius: 14,
+    background: S.loc,
+    color: "#fff",
+    boxShadow: "0 10px 22px rgba(212,5,17,0.16)",
   };
 }
 
