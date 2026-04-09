@@ -239,7 +239,7 @@ function LocationScreen({ view, setView, onOpenDetail, locVehicles, onFilterChan
         subtitle="Alternez entre une vue liste et une vue grille pour parcourir les vehicules"
         right={<ViewToggle view={view} onChange={setView} count={locVehicles.length} accent={S.loc} />}
       >
-        <div className="car-grid" style={carGridStyle(view)}>
+        <div className="car-grid" style={carGridStyle(view, locVehicles.length)}>
           {locVehicles.map((vehicle) => (
             <CarCard key={vehicle.id} vehicle={vehicle} onClick={() => onOpenDetail(vehicle.id)} gridView={view === "grid"} accent={S.loc} />
           ))}
@@ -280,7 +280,7 @@ function AchatScreen({ view, setView, onOpenDetail, vntVehicles, onFilterChange 
         subtitle="Les clients peuvent consulter les fiches detaillees, les informations techniques et les avis d'acheteurs"
         right={<ViewToggle view={view} onChange={setView} count={vntVehicles.length} accent={S.vnt} />}
       >
-        <div className="car-grid" style={carGridStyle(view)}>
+        <div className="car-grid" style={carGridStyle(view, vntVehicles.length)}>
           {vntVehicles.map((vehicle) => (
             <CarCard key={vehicle.id} vehicle={vehicle} onClick={() => onOpenDetail(vehicle.id)} gridView={view === "grid"} accent={S.vnt} />
           ))}
@@ -288,7 +288,7 @@ function AchatScreen({ view, setView, onOpenDetail, vntVehicles, onFilterChange 
       </Panel>
 
       <Panel title="Selection du moment" subtitle="Quelques vehicules mis en avant pour l'achat">
-        <div style={stableCardGridStyle()}>
+        <div style={stableCardGridStyle(recent.length)}>
           {recent.map((vehicle) => (
             <CarCard key={vehicle.id} vehicle={vehicle} onClick={() => onOpenDetail(vehicle.id)} gridView accent={S.vnt} />
           ))}
@@ -601,21 +601,27 @@ function formGrid(isMobile = false, compact = false) {
   };
 }
 
-function carGridStyle(view) {
+function carGridStyle(view, count = 0) {
+  const fewResults = count > 0 && count <= 2;
   return {
     display: view === "grid" ? "grid" : "flex",
-    gridTemplateColumns: view === "grid" ? "repeat(auto-fill, minmax(240px, 280px))" : "",
-    justifyContent: view === "grid" ? "start" : undefined,
+    gridTemplateColumns: view === "grid"
+      ? (fewResults ? "repeat(auto-fill, minmax(280px, 320px))" : "repeat(auto-fit, minmax(280px, 1fr))")
+      : "",
+    justifyContent: view === "grid" ? (fewResults ? "start" : "stretch") : undefined,
     flexDirection: view === "grid" ? undefined : "column",
     gap: 12,
   };
 }
 
-function stableCardGridStyle() {
+function stableCardGridStyle(count = 0) {
+  const fewResults = count > 0 && count <= 2;
   return {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(240px, 280px))",
-    justifyContent: "start",
+    gridTemplateColumns: fewResults
+      ? "repeat(auto-fill, minmax(280px, 320px))"
+      : "repeat(auto-fit, minmax(280px, 1fr))",
+    justifyContent: fewResults ? "start" : "stretch",
     gap: 12,
   };
 }
