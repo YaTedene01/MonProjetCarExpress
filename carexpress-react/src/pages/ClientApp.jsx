@@ -288,7 +288,7 @@ function AchatScreen({ view, setView, onOpenDetail, vntVehicles, onFilterChange 
       </Panel>
 
       <Panel title="Selection du moment" subtitle="Quelques vehicules mis en avant pour l'achat">
-        <div style={autoGrid(260)}>
+        <div style={stableCardGridStyle()}>
           {recent.map((vehicle) => (
             <CarCard key={vehicle.id} vehicle={vehicle} onClick={() => onOpenDetail(vehicle.id)} gridView accent={S.vnt} />
           ))}
@@ -607,6 +607,15 @@ function carGridStyle(view) {
     gridTemplateColumns: view === "grid" ? "repeat(auto-fill, minmax(240px, 280px))" : "",
     justifyContent: view === "grid" ? "start" : undefined,
     flexDirection: view === "grid" ? undefined : "column",
+    gap: 12,
+  };
+}
+
+function stableCardGridStyle() {
+  return {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(240px, 280px))",
+    justifyContent: "start",
     gap: 12,
   };
 }

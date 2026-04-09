@@ -351,8 +351,8 @@ export function Hero({ eyebrow, title, subtitle, badge, accent }) {
     <div style={{
       margin: isMobile ? 8 : 12,
       background: 'linear-gradient(135deg, #101010 0%, #241b16 46%, #382419 100%)',
-      borderRadius: 24, padding: isMobile ? '14px 12px' : '18px 16px',
-      minHeight: isMobile ? undefined : 300,
+      borderRadius: 24, padding: isMobile ? '12px 10px' : '14px 14px',
+      height: isMobile ? undefined : 240,
       position: 'relative', overflow: 'hidden',
       border: `1px solid rgba(255,255,255,0.08)`,
       boxShadow: '0 26px 60px rgba(17,17,17,0.16)',
