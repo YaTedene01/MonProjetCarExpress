@@ -352,6 +352,7 @@ export function Hero({ eyebrow, title, subtitle, badge, accent }) {
       margin: isMobile ? 8 : 12,
       background: 'linear-gradient(135deg, #101010 0%, #241b16 46%, #382419 100%)',
       borderRadius: 24, padding: isMobile ? '14px 12px' : '18px 16px',
+      minHeight: isMobile ? undefined : 300,
       position: 'relative', overflow: 'hidden',
       border: `1px solid rgba(255,255,255,0.08)`,
       boxShadow: '0 26px 60px rgba(17,17,17,0.16)',
@@ -403,13 +404,13 @@ export function Hero({ eyebrow, title, subtitle, badge, accent }) {
 }
 
 // ── SearchBox ─────────────────────────────────────────────────────────
-export function SearchBox({ placeholder, value, onChange }) {
+export function SearchBox({ placeholder, value, onChange, compact = false }) {
   const { isMobile } = useResponsive();
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
       background: 'rgba(255,255,255,0.72)', border: `1px solid ${S.border}`,
-      borderRadius: S.radius, padding: isMobile ? '11px 14px' : '13px 16px',
+      borderRadius: compact ? 14 : S.radius, padding: compact ? (isMobile ? '8px 12px' : '9px 12px') : (isMobile ? '11px 14px' : '13px 16px'),
       boxShadow: '0 10px 26px rgba(17,17,17,0.04)',
     }}>
       <svg width={isMobile ? 14 : 16} height={isMobile ? 14 : 16} viewBox="0 0 24 24" fill="none" stroke={S.text3} strokeWidth={2}>
@@ -417,7 +418,7 @@ export function SearchBox({ placeholder, value, onChange }) {
       </svg>
       <input type="text" placeholder={placeholder} value={value}
         onChange={e => onChange(e.target.value)}
-        style={{ border: 'none', background: 'transparent', fontSize: isMobile ? 13 : 14, color: S.text, flex: 1, outline: 'none' }} />
+        style={{ border: 'none', background: 'transparent', fontSize: compact ? (isMobile ? 12 : 13) : (isMobile ? 13 : 14), color: S.text, flex: 1, outline: 'none' }} />
     </div>
   );
 }

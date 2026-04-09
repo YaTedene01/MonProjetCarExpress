@@ -264,9 +264,9 @@ function AchatScreen({ view, setView, onOpenDetail, vntVehicles, onFilterChange 
         accent={S.vnt}
       />
 
-      <Panel title="Recherche achat" subtitle="Marque, modele ou annee">
-        <div style={{ display: "grid", gap: 12 }}>
-          <SearchBox placeholder="Marque, modele, annee..." value={query} onChange={setQuery} />
+      <Panel title="Recherche achat" subtitle="Marque, modele ou annee" dense>
+        <div style={{ display: "grid", gap: 8 }}>
+          <SearchBox compact placeholder="Marque, modele, annee..." value={query} onChange={setQuery} />
           <Btn outline accent={S.vnt} small style={{ width: "fit-content", minWidth: 170 }} onClick={() => setQuery("")}>Reinitialiser</Btn>
         </div>
       </Panel>
