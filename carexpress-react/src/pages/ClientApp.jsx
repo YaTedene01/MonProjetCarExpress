@@ -197,26 +197,6 @@ function LocationScreen({ view, setView, onOpenDetail, locVehicles, onFilterChan
 
       <Panel title="Planifier une location" subtitle="Lieu, dates, horaires et remise a zero du formulaire">
         <div style={rentalFormShellStyle()}>
-          <div style={compactRentalHeaderStyle(isMobile)}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{ maxWidth: 460 }}>
-                <div style={rentalEyebrowStyle()}>Reservation rapide</div>
-                <div style={{ fontSize: isMobile ? 18 : 20, fontWeight: 800, color: S.text, lineHeight: 1.2 }}>
-                  Préparez votre location
-                </div>
-              </div>
-              <div style={compactRentalBadgeStyle()}>
-                <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.14em", opacity: 0.82 }}>Parcours</span>
-                <strong style={{ fontSize: 16 }}>Location Car Express</strong>
-              </div>
-            </div>
-            <div style={compactRentalSummaryStyle(isMobile)}>
-              <span>Prise en charge: <strong>{lieu || "A definir"}</strong></span>
-              <span>Depart: <strong>{depDate ? `${depDate} · ${depH}` : "Non renseigne"}</strong></span>
-              <span>Retour: <strong>{retDate ? `${retDate} · ${retH}` : "Non renseigne"}</strong></span>
-            </div>
-          </div>
-
           <div style={{ display: "grid", gap: 14 }}>
             <Field label="Lieu de prise en charge" hint="Ville, aeroport ou adresse de remise">
               <input value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Ville, aeroport ou adresse" style={inputStyle("text")} />
@@ -635,98 +615,6 @@ function rentalFormShellStyle() {
     display: "grid",
     gap: 14,
   };
-}
-
-function rentalFormHeroStyle() {
-  return {
-    padding: "18px",
-    borderRadius: 26,
-    border: `1px solid rgba(212,5,17,0.16)`,
-    background: "linear-gradient(135deg, rgba(255,241,241,0.98) 0%, rgba(255,255,255,0.98) 56%, rgba(255,248,244,0.98) 100%)",
-    boxShadow: "0 24px 48px rgba(212,5,17,0.08)",
-  };
-}
-
-function rentalEyebrowStyle() {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    padding: "8px 12px",
-    borderRadius: 999,
-    border: `1px solid rgba(212,5,17,0.14)`,
-    background: "rgba(255,255,255,0.78)",
-    color: S.loc,
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: "0.14em",
-    textTransform: "uppercase",
-    marginBottom: 12,
-  };
-}
-
-function rentalStatBadgeStyle() {
-  return {
-    minWidth: 170,
-    display: "grid",
-    gap: 6,
-    padding: "14px 16px",
-    borderRadius: 20,
-    background: S.loc,
-    color: "#fff",
-    boxShadow: "0 18px 34px rgba(212,5,17,0.2)",
-  };
-}
-
-function compactRentalHeaderStyle(isMobile = false) {
-  return {
-    display: "grid",
-    gap: 8,
-    padding: isMobile ? "12px" : "12px 14px",
-    borderRadius: 18,
-    border: `1px solid rgba(212,5,17,0.12)`,
-    background: "linear-gradient(135deg, rgba(255,245,245,0.96) 0%, rgba(255,255,255,0.96) 100%)",
-  };
-}
-
-function compactRentalSummaryStyle(isMobile = false) {
-  return {
-    display: "grid",
-    gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))",
-    gap: 6,
-    fontSize: 11,
-    color: S.text2,
-  };
-}
-
-function compactRentalBadgeStyle() {
-  return {
-    minWidth: 150,
-    display: "grid",
-    gap: 4,
-    padding: "9px 12px",
-    borderRadius: 14,
-    background: S.loc,
-    color: "#fff",
-    boxShadow: "0 10px 22px rgba(212,5,17,0.16)",
-  };
-}
-
-function rentalMiniInfoGridStyle(isMobile = false) {
-  return {
-    display: "grid",
-    gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))",
-    gap: 12,
-    marginTop: 18,
-  };
-}
-
-function MiniInfoCard({ label, value }) {
-  return (
-    <div style={{ padding: "14px 15px", borderRadius: 18, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.74)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.8)" }}>
-      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", color: S.text3 }}>{label}</div>
-      <div style={{ marginTop: 7, fontSize: 14, fontWeight: 700, color: S.text }}>{value}</div>
-    </div>
-  );
 }
 
 function inputStyle(kind = "text") {
