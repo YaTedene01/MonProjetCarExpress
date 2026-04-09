@@ -197,7 +197,7 @@ function LocationScreen({ view, setView, onOpenDetail, locVehicles, onFilterChan
 
       <Panel title="Planifier une location" subtitle="Lieu, dates, horaires et remise a zero du formulaire" dense>
         <div style={rentalFormShellStyle(true)}>
-          <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "grid", gap: 8 }}>
             <Field compact label="Lieu de prise en charge" hint="Ville, aeroport ou adresse de remise">
               <input value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Ville, aeroport ou adresse" style={inputStyle("text", true)} />
             </Field>
@@ -223,9 +223,9 @@ function LocationScreen({ view, setView, onOpenDetail, locVehicles, onFilterChan
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 0 }}>
-            <Btn small accent={S.loc}>Rechercher</Btn>
-            <Btn small outline accent={S.loc} onClick={reset}>Reinitialiser</Btn>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: -2 }}>
+            <Btn small accent={S.loc} style={{ width: "fit-content", minWidth: 132, padding: "8px 14px" }}>Rechercher</Btn>
+            <Btn small outline accent={S.loc} style={{ width: "fit-content", minWidth: 132, padding: "8px 14px" }} onClick={reset}>Reinitialiser</Btn>
           </div>
         </div>
       </Panel>
@@ -528,14 +528,14 @@ function Panel({ title, subtitle, right, children, noPadding, dense = false }) {
       boxShadow: "0 18px 50px rgba(24,21,18,0.06)",
       overflow: "hidden",
     }}>
-      <div style={{ padding: dense ? "12px 14px 0" : "18px 20px 0", display: "flex", justifyContent: "space-between", gap: dense ? 8 : 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div style={{ padding: dense ? "10px 12px 0" : "18px 20px 0", display: "flex", justifyContent: "space-between", gap: dense ? 6 : 12, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: dense ? 17 : 20, fontWeight: 700, color: S.text }}>{title}</div>
-          {subtitle && <div style={{ marginTop: dense ? 4 : 6, color: S.text3, fontSize: dense ? 12 : 14 }}>{subtitle}</div>}
+          <div style={{ fontSize: dense ? 16 : 20, fontWeight: 700, color: S.text }}>{title}</div>
+          {subtitle && <div style={{ marginTop: dense ? 3 : 6, color: S.text3, fontSize: dense ? 11 : 14 }}>{subtitle}</div>}
         </div>
         {right}
       </div>
-      <div style={{ padding: noPadding ? 0 : (dense ? 14 : 20) }}>{children}</div>
+      <div style={{ padding: noPadding ? 0 : (dense ? 12 : 20) }}>{children}</div>
     </section>
   );
 }
@@ -545,7 +545,7 @@ function Field({ label, hint, children, compact = false }) {
     <div>
       <div style={{ fontSize: compact ? 10 : 11, textTransform: "uppercase", letterSpacing: "0.11em", color: S.text3, marginBottom: compact ? 5 : 8 }}>{label}</div>
       {children}
-      {hint && <div style={{ marginTop: compact ? 4 : 7, color: S.text3, fontSize: compact ? 11 : 12, lineHeight: 1.4 }}>{hint}</div>}
+      {hint && <div style={{ marginTop: compact ? 3 : 7, color: S.text3, fontSize: compact ? 10 : 12, lineHeight: 1.35 }}>{hint}</div>}
     </div>
   );
 }
@@ -595,8 +595,8 @@ function formGrid(isMobile = false, compact = false) {
   return {
     display: "grid",
     gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) minmax(0, 1fr)",
-    columnGap: isMobile ? 10 : (compact ? 20 : 32),
-    rowGap: compact ? 6 : 10,
+    columnGap: isMobile ? 8 : (compact ? 16 : 32),
+    rowGap: compact ? 4 : 10,
     alignItems: "end",
   };
 }
@@ -613,21 +613,21 @@ function carGridStyle(view) {
 function rentalFormShellStyle(compact = false) {
   return {
     display: "grid",
-    gap: compact ? 10 : 14,
+    gap: compact ? 8 : 14,
   };
 }
 
 function inputStyle(kind = "text", compact = false) {
   return {
     width: "100%",
-    minHeight: compact ? 34 : 38,
+    minHeight: compact ? 30 : 38,
     boxSizing: "border-box",
-    padding: compact ? "5px 10px" : (kind === "date" ? "6px 10px" : "6px 10px"),
+    padding: compact ? "4px 9px" : (kind === "date" ? "6px 10px" : "6px 10px"),
     borderRadius: compact ? 9 : 10,
     border: `1px solid rgba(24,21,18,0.14)`,
     background: "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(252,249,246,0.98) 100%)",
     outline: "none",
-    fontSize: compact ? 11 : 12,
+    fontSize: compact ? 10.5 : 12,
     color: S.text,
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.88), 0 12px 26px rgba(17,17,17,0.04)",
   };
@@ -639,7 +639,7 @@ function timeSelectStyle(isMobile = false, compact = false) {
     width: "100%",
     minWidth: 0,
     padding: compact
-      ? (isMobile ? "5px 10px" : "5px 28px 5px 10px")
+      ? (isMobile ? "4px 9px" : "4px 24px 4px 9px")
       : (isMobile ? "6px 10px" : "6px 30px 6px 10px"),
     appearance: "auto",
   };

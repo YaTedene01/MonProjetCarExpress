@@ -349,9 +349,9 @@ export function Hero({ eyebrow, title, subtitle, badge, accent }) {
   const { isMobile } = useResponsive();
   return (
     <div style={{
-      margin: isMobile ? 12 : 16,
+      margin: isMobile ? 8 : 12,
       background: 'linear-gradient(135deg, #101010 0%, #241b16 46%, #382419 100%)',
-      borderRadius: 28, padding: isMobile ? '20px 16px' : '28px 22px',
+      borderRadius: 24, padding: isMobile ? '14px 12px' : '18px 16px',
       position: 'relative', overflow: 'hidden',
       border: `1px solid rgba(255,255,255,0.08)`,
       boxShadow: '0 26px 60px rgba(17,17,17,0.16)',
@@ -371,26 +371,26 @@ export function Hero({ eyebrow, title, subtitle, badge, accent }) {
       }} />
       {eyebrow && (
         <div style={{
-          fontSize: isMobile ? 9 : 10, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.48)',
-          textTransform: 'uppercase', marginBottom: 8, position: 'relative', fontWeight: 500,
+          fontSize: isMobile ? 8 : 9, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.48)',
+          textTransform: 'uppercase', marginBottom: 6, position: 'relative', fontWeight: 500,
         }}>
           {eyebrow}
         </div>
       )}
       <h2 style={{
-        fontSize: isMobile ? 24 : 28, fontWeight: 800, color: '#fff',
-        marginBottom: 8, position: 'relative', lineHeight: 1.02, maxWidth: 420,
+        fontSize: isMobile ? 20 : 24, fontWeight: 800, color: '#fff',
+        marginBottom: 6, position: 'relative', lineHeight: 1.03, maxWidth: 520,
       }}>
         {title}
       </h2>
-      <p style={{ fontSize: isMobile ? 13 : 14, color: 'rgba(255,255,255,0.68)', lineHeight: 1.7, position: 'relative', maxWidth: 460 }}>
+      <p style={{ fontSize: isMobile ? 12 : 13, color: 'rgba(255,255,255,0.68)', lineHeight: 1.5, position: 'relative', maxWidth: 560, margin: 0 }}>
         {subtitle}
       </p>
       {badge && (
         <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 14,
+          display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10,
           border: `1px solid ${accent || 'rgba(255,255,255,0.18)'}`,
-          borderRadius: 999, padding: '7px 14px', fontSize: isMobile ? 11 : 12,
+          borderRadius: 999, padding: '5px 11px', fontSize: isMobile ? 10 : 11,
           color: 'rgba(255,255,255,0.85)', position: 'relative',
           background: 'rgba(255,255,255,0.06)',
         }}>
