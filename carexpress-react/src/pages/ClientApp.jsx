@@ -195,37 +195,37 @@ function LocationScreen({ view, setView, onOpenDetail, locVehicles, onFilterChan
         accent={S.loc}
       />
 
-      <Panel title="Planifier une location" subtitle="Lieu, dates, horaires et remise a zero du formulaire">
-        <div style={rentalFormShellStyle()}>
-          <div style={{ display: "grid", gap: 14 }}>
-            <Field label="Lieu de prise en charge" hint="Ville, aeroport ou adresse de remise">
-              <input value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Ville, aeroport ou adresse" style={inputStyle("text")} />
+      <Panel title="Planifier une location" subtitle="Lieu, dates, horaires et remise a zero du formulaire" dense>
+        <div style={rentalFormShellStyle(true)}>
+          <div style={{ display: "grid", gap: 10 }}>
+            <Field compact label="Lieu de prise en charge" hint="Ville, aeroport ou adresse de remise">
+              <input value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Ville, aeroport ou adresse" style={inputStyle("text", true)} />
             </Field>
-            <div style={formGrid(isMobile)}>
-              <Field label="Date depart" hint="Jour de debut de votre reservation">
-                <input type="date" value={depDate} onChange={(e) => setDepDate(e.target.value)} style={inputStyle("date")} />
+            <div style={formGrid(isMobile, true)}>
+              <Field compact label="Date depart" hint="Jour de debut de votre reservation">
+                <input type="date" value={depDate} onChange={(e) => setDepDate(e.target.value)} style={inputStyle("date", true)} />
               </Field>
-              <Field label="Heure depart" hint="Heure souhaitee pour recuperer le vehicule">
-                <select value={depH} onChange={(e) => setDepH(e.target.value)} style={timeSelectStyle(isMobile)}>
+              <Field compact label="Heure depart" hint="Heure souhaitee pour recuperer le vehicule">
+                <select value={depH} onChange={(e) => setDepH(e.target.value)} style={timeSelectStyle(isMobile, true)}>
                   {heures.map((hour) => <option key={hour}>{hour}</option>)}
                 </select>
               </Field>
             </div>
-            <div style={formGrid(isMobile)}>
-              <Field label="Date retour" hint="Jour de fin de votre reservation">
-                <input type="date" value={retDate} onChange={(e) => setRetDate(e.target.value)} style={inputStyle("date")} />
+            <div style={formGrid(isMobile, true)}>
+              <Field compact label="Date retour" hint="Jour de fin de votre reservation">
+                <input type="date" value={retDate} onChange={(e) => setRetDate(e.target.value)} style={inputStyle("date", true)} />
               </Field>
-              <Field label="Heure retour" hint="Heure prevue pour la restitution">
-                <select value={retH} onChange={(e) => setRetH(e.target.value)} style={timeSelectStyle(isMobile)}>
+              <Field compact label="Heure retour" hint="Heure prevue pour la restitution">
+                <select value={retH} onChange={(e) => setRetH(e.target.value)} style={timeSelectStyle(isMobile, true)}>
                   {heures.map((hour) => <option key={hour}>{hour}</option>)}
                 </select>
               </Field>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 2 }}>
-            <Btn accent={S.loc}>Rechercher</Btn>
-            <Btn outline accent={S.loc} onClick={reset}>Reinitialiser</Btn>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 0 }}>
+            <Btn small accent={S.loc}>Rechercher</Btn>
+            <Btn small outline accent={S.loc} onClick={reset}>Reinitialiser</Btn>
           </div>
         </div>
       </Panel>
@@ -519,33 +519,33 @@ function ProfilPage({ user, avatarInitials, onLogout, reservations, purchases })
   );
 }
 
-function Panel({ title, subtitle, right, children, noPadding }) {
+function Panel({ title, subtitle, right, children, noPadding, dense = false }) {
   return (
     <section style={{
-      borderRadius: 24,
+      borderRadius: dense ? 20 : 24,
       border: `1px solid ${S.border}`,
       background: S.panel,
       boxShadow: "0 18px 50px rgba(24,21,18,0.06)",
       overflow: "hidden",
     }}>
-      <div style={{ padding: "18px 20px 0", display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div style={{ padding: dense ? "12px 14px 0" : "18px 20px 0", display: "flex", justifyContent: "space-between", gap: dense ? 8 : 12, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: S.text }}>{title}</div>
-          {subtitle && <div style={{ marginTop: 6, color: S.text3, fontSize: 14 }}>{subtitle}</div>}
+          <div style={{ fontSize: dense ? 17 : 20, fontWeight: 700, color: S.text }}>{title}</div>
+          {subtitle && <div style={{ marginTop: dense ? 4 : 6, color: S.text3, fontSize: dense ? 12 : 14 }}>{subtitle}</div>}
         </div>
         {right}
       </div>
-      <div style={{ padding: noPadding ? 0 : 20 }}>{children}</div>
+      <div style={{ padding: noPadding ? 0 : (dense ? 14 : 20) }}>{children}</div>
     </section>
   );
 }
 
-function Field({ label, hint, children }) {
+function Field({ label, hint, children, compact = false }) {
   return (
     <div>
-      <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.11em", color: S.text3, marginBottom: 8 }}>{label}</div>
+      <div style={{ fontSize: compact ? 10 : 11, textTransform: "uppercase", letterSpacing: "0.11em", color: S.text3, marginBottom: compact ? 5 : 8 }}>{label}</div>
       {children}
-      {hint && <div style={{ marginTop: 7, color: S.text3, fontSize: 12, lineHeight: 1.5 }}>{hint}</div>}
+      {hint && <div style={{ marginTop: compact ? 4 : 7, color: S.text3, fontSize: compact ? 11 : 12, lineHeight: 1.4 }}>{hint}</div>}
     </div>
   );
 }
@@ -591,12 +591,12 @@ function autoGrid(min, gap = 16) {
   return { display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(${Math.max(min, 180)}px, 1fr))`, gap };
 }
 
-function formGrid(isMobile = false) {
+function formGrid(isMobile = false, compact = false) {
   return {
     display: "grid",
     gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) minmax(0, 1fr)",
-    columnGap: isMobile ? 12 : 32,
-    rowGap: 10,
+    columnGap: isMobile ? 10 : (compact ? 20 : 32),
+    rowGap: compact ? 6 : 10,
     alignItems: "end",
   };
 }
@@ -610,35 +610,37 @@ function carGridStyle(view) {
   };
 }
 
-function rentalFormShellStyle() {
+function rentalFormShellStyle(compact = false) {
   return {
     display: "grid",
-    gap: 14,
+    gap: compact ? 10 : 14,
   };
 }
 
-function inputStyle(kind = "text") {
+function inputStyle(kind = "text", compact = false) {
   return {
     width: "100%",
-    minHeight: 38,
+    minHeight: compact ? 34 : 38,
     boxSizing: "border-box",
-    padding: kind === "date" ? "6px 10px" : "6px 10px",
-    borderRadius: 10,
+    padding: compact ? "5px 10px" : (kind === "date" ? "6px 10px" : "6px 10px"),
+    borderRadius: compact ? 9 : 10,
     border: `1px solid rgba(24,21,18,0.14)`,
     background: "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(252,249,246,0.98) 100%)",
     outline: "none",
-    fontSize: 12,
+    fontSize: compact ? 11 : 12,
     color: S.text,
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.88), 0 12px 26px rgba(17,17,17,0.04)",
   };
 }
 
-function timeSelectStyle(isMobile = false) {
+function timeSelectStyle(isMobile = false, compact = false) {
   return {
-    ...inputStyle(),
+    ...inputStyle("text", compact),
     width: "100%",
     minWidth: 0,
-    padding: isMobile ? "6px 10px" : "6px 30px 6px 10px",
+    padding: compact
+      ? (isMobile ? "5px 10px" : "5px 28px 5px 10px")
+      : (isMobile ? "6px 10px" : "6px 30px 6px 10px"),
     appearance: "auto",
   };
 }
