@@ -131,7 +131,7 @@ export function FilterPanel({ prefix, accent, onClose, onApply }) {
         <div style={{position:'relative',marginBottom:10}}>
           <svg style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',width:14,height:14,stroke:S.text3,fill:'none',strokeWidth:2}} viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <input placeholder="Rechercher une marque…" value={marqueSearch} onChange={e=>setMarqueSearch(e.target.value)}
-            style={{width:'100%',padding:'8px 10px 8px 32px',border:`1px solid ${S.border}`,borderRadius:8,fontSize:13,color:S.text,outline:'none',background:S.bg2}}/>
+            style={{width:'100%',maxWidth:'100%',boxSizing:'border-box',padding:'8px 10px 8px 32px',border:`1px solid ${S.border}`,borderRadius:8,fontSize:13,color:S.text,outline:'none',background:S.bg2}}/>
         </div>
         <div style={{display:'flex',flexWrap:'wrap',gap:7,marginBottom:12}}>
           {filteredMarques.map(m=>(

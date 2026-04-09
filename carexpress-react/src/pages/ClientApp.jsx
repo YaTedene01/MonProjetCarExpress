@@ -604,7 +604,8 @@ function formGrid(isMobile = false, compact = false) {
 function carGridStyle(view) {
   return {
     display: view === "grid" ? "grid" : "flex",
-    gridTemplateColumns: view === "grid" ? "repeat(auto-fit, minmax(280px, 1fr))" : "",
+    gridTemplateColumns: view === "grid" ? "repeat(auto-fill, minmax(240px, 280px))" : "",
+    justifyContent: view === "grid" ? "start" : undefined,
     flexDirection: view === "grid" ? undefined : "column",
     gap: 12,
   };
