@@ -57,6 +57,11 @@ export async function fetchAgencyDashboard() {
   return response.data || {};
 }
 
+export async function fetchAgencyAlerts() {
+  const response = await apiRequest("/agence/alertes");
+  return response.data || [];
+}
+
 export async function fetchAgencyVehicles() {
   const response = await apiRequest("/agence/vehicules");
   return response.data || [];
@@ -100,4 +105,3 @@ export async function createAdminAgency(payload) {
   });
   return response.data;
 }
-

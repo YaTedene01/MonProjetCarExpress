@@ -5,7 +5,7 @@ import tucsonImg from "../assets/tucson.png";
 import kiaImg from "../assets/kia.png";
 import dusterImg from "../assets/duster.jpeg";
 import ChatPanel from "../components/ChatPanel";
-import { createAgencyVehicle, fetchAgencyDashboard, fetchAgencyVehicles, updateAgencyVehicle } from "../services/catalogue";
+import { createAgencyVehicle, fetchAgencyAlerts, fetchAgencyDashboard, fetchAgencyVehicles, updateAgencyVehicle } from "../services/catalogue";
 import { adaptAgencyVehicleRow } from "../services/adapters";
 
 const S = {
@@ -62,6 +62,7 @@ const requestSteps = [
 export default function AgencyApp({ onLogout, branding, chatThreads, sendChatMessage, onGoToLanding }) {
   const [page, setPage] = useState("home");
   const [vehicles, setVehicles] = useState(initialAgencyVehicles);
+  const [alerts, setAlerts] = useState(agencyAlerts);
   const [showNewListing, setShowNewListing] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState(null);
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
@@ -84,13 +85,24 @@ export default function AgencyApp({ onLogout, branding, chatThreads, sendChatMes
     Promise.all([
       fetchAgencyVehicles().catch(() => []),
       fetchAgencyDashboard().catch(() => null),
-    ]).then(([apiVehicles, dashboard]) => {
+      fetchAgencyAlerts().catch(() => []),
+    ]).then(([apiVehicles, dashboard, apiAlerts]) => {
       if (apiVehicles.length) {
         setVehicles(apiVehicles.map((vehicle) => adaptAgencyVehicleRow(vehicle)));
       }
 
       if (dashboard?.metrics) {
         setDashboardMetrics(dashboard.metrics);
+      }
+
+      if (apiAlerts.length) {
+        setAlerts(apiAlerts.map((alert) => ({
+          read: Boolean(alert.is_read),
+          title: alert.title,
+          sub: alert.message,
+          time: formatAlertTime(alert.created_at),
+          tone: "red",
+        })));
       }
     });
   }, []);
@@ -136,7 +148,7 @@ export default function AgencyApp({ onLogout, branding, chatThreads, sendChatMes
         }}
       />
       <section className="container-responsive" style={{ maxWidth: 1360, margin: "0 auto", padding: "20px 20px 0" }}>
-        {page === "home" && <AgencyHome setPage={setPage} vehicles={vehicles} onCreateListing={() => setShowNewListing(true)} branding={agencyBrand} dashboardMetrics={dashboardMetrics} />}
+        {page === "home" && <AgencyHome setPage={setPage} vehicles={vehicles} alerts={alerts} onCreateListing={() => setShowNewListing(true)} branding={agencyBrand} dashboardMetrics={dashboardMetrics} />}
         {page === "annonces" && <AgencyAnnonces vehicles={vehicles} onCreateListing={() => setShowNewListing(true)} onEditVehicle={setEditingVehicle} onDeleteVehicle={(vehicleName) => setVehicles((current) => current.filter((item) => item.name !== vehicleName))} />}
         {page === "messages" && <AgencyMessages chatThreads={chatThreads} branding={agencyBrand} sendChatMessage={sendChatMessage} />}
         {page === "profil" && <AgencyProfil branding={agencyBrand} onLogout={onLogout} />}
@@ -146,7 +158,7 @@ export default function AgencyApp({ onLogout, branding, chatThreads, sendChatMes
   );
 }
 
-function AgencyHome({ setPage, vehicles, onCreateListing, branding, dashboardMetrics }) {
+function AgencyHome({ setPage, vehicles, alerts, onCreateListing, branding, dashboardMetrics }) {
   const occupancy = 84;
 
   return (
@@ -204,16 +216,18 @@ function AgencyHome({ setPage, vehicles, onCreateListing, branding, dashboardMet
         </Panel>
 
         <Panel
-          title="Actions prioritaires"
-          subtitle="Ce qui demande une intervention rapide"
+          title="Notifications agence"
+          subtitle="Dernieres reservations et alertes importantes"
         >
-          <ActionList
-            items={[
-              "Rappeler 3 clients pour confirmer les horaires de prise en charge.",
-              "Verifier les pieces du dossier achat de la Kia Sportage.",
-              "Remettre en ligne le Toyota Hiace apres controle technique.",
-            ]}
-          />
+          {alerts.length > 0 ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              {alerts.slice(0, 4).map((alert) => (
+                <AlertRow key={`${alert.title}-${alert.time}`} alert={alert} />
+              ))}
+            </div>
+          ) : (
+            <div style={{ color: S.text3, fontSize: 14 }}>Aucune notification pour le moment.</div>
+          )}
         </Panel>
       </div>
     </div>
@@ -650,6 +664,28 @@ function ActionList({ items }) {
       ))}
     </div>
   );
+}
+
+function formatAlertTime(createdAt) {
+  if (!createdAt) return "A l'instant";
+
+  const created = new Date(createdAt);
+  const now = new Date();
+  const diffMs = now.getTime() - created.getTime();
+
+  if (Number.isNaN(diffMs) || diffMs < 0) {
+    return "A l'instant";
+  }
+
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) return "A l'instant";
+  if (diffMinutes < 60) return `Il y a ${diffMinutes} min`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `Il y a ${diffHours} h`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `Il y a ${diffDays} j`;
 }
 
 function StatusBadge({ value }) {

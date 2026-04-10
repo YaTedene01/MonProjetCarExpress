@@ -5,13 +5,14 @@ use App\Http\Controllers\Api\Admin\AgencyRegistrationRequestController as AdminA
 use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\Admin\SystemController as AdminSystemController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Api\Agency\AlertController as AgencyAlertController;
 use App\Http\Controllers\Api\Agency\DashboardController as AgencyDashboardController;
 use App\Http\Controllers\Api\Agency\ProfileController as AgencyProfileController;
 use App\Http\Controllers\Api\Agency\PurchaseRequestController as AgencyPurchaseRequestController;
 use App\Http\Controllers\Api\Agency\ReservationController as AgencyReservationController;
 use App\Http\Controllers\Api\Agency\VehicleController as AgencyVehicleController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\Client\AlertController;
+use App\Http\Controllers\Api\Client\AlertController as ClientAlertController;
 use App\Http\Controllers\Api\Client\ProfileController;
 use App\Http\Controllers\Api\Client\PurchaseRequestController;
 use App\Http\Controllers\Api\Client\ReservationController;
@@ -81,12 +82,14 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/reservations', [ReservationController::class, 'store']);
             Route::get('/demandes-achat', [PurchaseRequestController::class, 'index']);
             Route::post('/demandes-achat', [PurchaseRequestController::class, 'store']);
-            Route::get('/alertes', [AlertController::class, 'index']);
-            Route::patch('/alertes/{alert}/lire', [AlertController::class, 'markAsRead']);
+            Route::get('/alertes', [ClientAlertController::class, 'index']);
+            Route::patch('/alertes/{alert}/lire', [ClientAlertController::class, 'markAsRead']);
         });
 
         Route::middleware('role:agency')->prefix('agence')->group(function (): void {
             Route::get('/tableau-de-bord', AgencyDashboardController::class);
+            Route::get('/alertes', [AgencyAlertController::class, 'index']);
+            Route::patch('/alertes/{alert}/lire', [AgencyAlertController::class, 'markAsRead']);
             Route::get('/vehicules', [AgencyVehicleController::class, 'index']);
             Route::post('/vehicules', [AgencyVehicleController::class, 'store']);
             Route::put('/vehicules/{vehicle}', [AgencyVehicleController::class, 'update']);
