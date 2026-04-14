@@ -54,6 +54,8 @@ export class VehicleService {
       const fuel = normalize(vehicle.fuel_type);
       const transmission = normalize(vehicle.transmission);
       const category = normalize(vehicle.category);
+      const city = normalize(vehicle.city);
+      const locationLabel = normalize(vehicle.location_label);
       const className = normalize(vehicle.class_name || vehicle.specs?.find((item) => normalize(item.label) === "classe")?.val);
       const seats = extractSeats(vehicle.seats);
 
@@ -91,6 +93,18 @@ export class VehicleService {
 
       if (filters.classe && filters.classe !== "Toutes" && !className.includes(normalize(filters.classe))) {
         return false;
+      }
+
+      if (filters.searchLocation) {
+        const requestedLocation = normalize(filters.searchLocation);
+
+        if (
+          requestedLocation &&
+          !city.includes(requestedLocation) &&
+          !locationLabel.includes(requestedLocation)
+        ) {
+          return false;
+        }
       }
 
       if (filters.prixMax && Number(vehicle.price || 0) > Number(filters.prixMax)) {

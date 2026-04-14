@@ -30,6 +30,23 @@ export default function ClientApp({ user, chatThreads, sendChatMessage, onLogout
   const [locationFilters, setLocationFilters] = useState(null);
   const [saleFilters, setSaleFilters] = useState(null);
 
+  const applyLocationFilters = (update) => {
+    if (typeof update === "function") {
+      setLocationFilters((current) => update(current));
+      return;
+    }
+
+    if (!update) {
+      setLocationFilters(null);
+      return;
+    }
+
+    setLocationFilters((current) => ({
+      ...(current || {}),
+      ...update,
+    }));
+  };
+
   useEffect(() => {
     Promise.all([
       fetchCatalogueVehicles(),
@@ -111,7 +128,7 @@ export default function ClientApp({ user, chatThreads, sendChatMessage, onLogout
       />
 
       <section className="container-responsive" style={{ maxWidth: 1360, margin: "0 auto", padding: "20px 20px 0" }}>
-        {page === "home" && <HomePage clientTab={clientTab} setClientTab={setClientTab} view={view} setView={setView} onOpenDetail={setDetail} locVehicles={filteredLocVehicles} vntVehicles={filteredVntVehicles} onLocationFilterChange={setLocationFilters} onSaleFilterChange={setSaleFilters} />}
+        {page === "home" && <HomePage clientTab={clientTab} setClientTab={setClientTab} view={view} setView={setView} onOpenDetail={setDetail} locVehicles={filteredLocVehicles} vntVehicles={filteredVntVehicles} onLocationFilterChange={applyLocationFilters} onSaleFilterChange={setSaleFilters} />}
         {page === "search" && <SearchPage onOpenDetail={setDetail} allVehiclesWithId={allVehiclesWithId} />}
         {page === "messages" && <MessagesPage user={user} chatThreads={chatThreads} sendChatMessage={sendChatMessage} />}
         {page === "profil" && <ProfilPage user={user} avatarInitials={avatarInitials} onLogout={onLogout} reservations={clientReservations} purchases={clientPurchases} />}
@@ -183,6 +200,17 @@ function LocationScreen({ view, setView, onOpenDetail, locVehicles, onFilterChan
     setRetDate("");
     setDepH("08:00");
     setRetH("18:00");
+    onFilterChange(null);
+  };
+
+  const handleSearch = () => {
+    onFilterChange({
+      searchLocation: lieu.trim() || null,
+      pickupDate: depDate || null,
+      returnDate: retDate || null,
+      pickupTime: depH || null,
+      returnTime: retH || null,
+    });
   };
 
   return (
@@ -224,7 +252,7 @@ function LocationScreen({ view, setView, onOpenDetail, locVehicles, onFilterChan
           </div>
 
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: -2 }}>
-            <Btn small accent={S.loc} style={{ width: "fit-content", minWidth: 132, padding: "8px 14px" }}>Rechercher</Btn>
+            <Btn small accent={S.loc} style={{ width: "fit-content", minWidth: 132, padding: "8px 14px" }} onClick={handleSearch}>Rechercher</Btn>
             <Btn small outline accent={S.loc} style={{ width: "fit-content", minWidth: 132, padding: "8px 14px" }} onClick={reset}>Reinitialiser</Btn>
           </div>
         </div>
@@ -252,7 +280,28 @@ function LocationScreen({ view, setView, onOpenDetail, locVehicles, onFilterChan
 function AchatScreen({ view, setView, onOpenDetail, vntVehicles, onFilterChange }) {
   const [query, setQuery] = useState("");
 
-  const recent = useMemo(() => vntVehicles.slice(0, 3), [vntVehicles]);
+  const displayedVehicles = useMemo(() => {
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed) return vntVehicles;
+
+    return vntVehicles.filter((vehicle) =>
+      [
+        vehicle.name,
+        vehicle.brand,
+        vehicle.model,
+        vehicle.year,
+        vehicle.city,
+        vehicle.category,
+        ...(vehicle.tags || []),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(trimmed)
+    );
+  }, [query, vntVehicles]);
+
+  const recent = useMemo(() => displayedVehicles.slice(0, 3), [displayedVehicles]);
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
@@ -278,10 +327,10 @@ function AchatScreen({ view, setView, onOpenDetail, vntVehicles, onFilterChange 
       <Panel
         title="Annonces recentes"
         subtitle="Les clients peuvent consulter les fiches detaillees, les informations techniques et les avis d'acheteurs"
-        right={<ViewToggle view={view} onChange={setView} count={vntVehicles.length} accent={S.vnt} />}
+        right={<ViewToggle view={view} onChange={setView} count={displayedVehicles.length} accent={S.vnt} />}
       >
-        <div className="car-grid" style={carGridStyle(view, vntVehicles.length)}>
-          {vntVehicles.map((vehicle) => (
+        <div className="car-grid" style={carGridStyle(view, displayedVehicles.length)}>
+          {displayedVehicles.map((vehicle) => (
             <CarCard key={vehicle.id} vehicle={vehicle} onClick={() => onOpenDetail(vehicle.id)} gridView={view === "grid"} accent={S.vnt} />
           ))}
         </div>

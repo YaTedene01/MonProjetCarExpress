@@ -13,12 +13,14 @@ class DemandeAchatService
 {
     public function __construct(
         private readonly PurchaseRequestRepository $purchaseRequests,
-        private readonly PaymentRepository $payments
+        private readonly PaymentRepository $payments,
+        private readonly TarificationService $tarificationService
     ) {}
 
     public function creer(array $data, object $vehicle, int $clientId)
     {
-        $serviceFee = $vehicle->service_fee ?: 95000;
+        $pricing = $this->tarificationService->calculate((float) $vehicle->price, 'sale');
+        $serviceFee = $pricing['amount'];
 
         $purchaseRequest = $this->purchaseRequests->create([
             ...$data,
@@ -31,7 +33,8 @@ class DemandeAchatService
         $this->payments->create([
             'purchase_request_id' => $purchaseRequest->id,
             'amount' => $serviceFee,
-            'method' => $purchaseRequest->payment_method,
+            'currency' => 'XOF',
+            'method' => $purchaseRequest->payment_method?->value ?? $purchaseRequest->payment_method,
             'status' => 'paid',
             'paid_at' => now(),
             'reference' => GenererReference::paiementAchat(),

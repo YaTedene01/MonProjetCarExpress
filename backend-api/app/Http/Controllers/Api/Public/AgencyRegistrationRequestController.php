@@ -41,7 +41,7 @@ class AgencyRegistrationRequestController extends Controller
 
         $documents = [];
 
-        foreach ($request->file('documents', []) as $file) {
+        foreach ($this->resolveDocumentFiles($request) as $file) {
             $storedPath = $file->storeAs(
                 sprintf('agency-registration-requests/%d', $registrationRequest->id),
                 Str::uuid()->toString().'.'.$file->getClientOriginalExtension(),
@@ -66,5 +66,26 @@ class AgencyRegistrationRequestController extends Controller
             new AgencyRegistrationRequestResource($registrationRequest),
             201
         );
+    }
+
+    private function resolveDocumentFiles(StoreAgencyRegistrationRequest $request): array
+    {
+        $documentFiles = $request->file('documents', []);
+
+        if (is_array($documentFiles) && $documentFiles !== []) {
+            return $documentFiles;
+        }
+
+        $allFiles = $request->allFiles();
+
+        if (isset($allFiles['documents']) && is_array($allFiles['documents'])) {
+            return $allFiles['documents'];
+        }
+
+        if (isset($allFiles['documents[]']) && is_array($allFiles['documents[]'])) {
+            return $allFiles['documents[]'];
+        }
+
+        return [];
     }
 }

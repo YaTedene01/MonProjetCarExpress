@@ -71,6 +71,9 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
   const [dashboardAlerts, setDashboardAlerts] = useState(adminAlerts);
   const [agencyRequests, setAgencyRequests] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [approveError, setApproveError] = useState("");
+  const [approveSuccess, setApproveSuccess] = useState("");
+  const [approvingRequestId, setApprovingRequestId] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -123,14 +126,27 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
         {page === "home" && <AdminHome onRegisterAgency={onRegisterAgency} agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} />}
         {page === "users" && <AdminUsers adminSearch={adminSearch} setAdminSearch={setAdminSearch} users={apiUsers} agencies={apiAgencies} />}
         {page === "agences" && <AdminAgences onViewAgency={setSelectedAgency} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} />}
-        {page === "messages" && <AdminMessages requests={agencyRequests} selectedRequest={selectedRequest} onSelectRequest={async (request) => {
+        {page === "messages" && <AdminMessages requests={agencyRequests} selectedRequest={selectedRequest} approveError={approveError} approveSuccess={approveSuccess} approvingRequestId={approvingRequestId} onSelectRequest={async (request) => {
+          setApproveError("");
+          setApproveSuccess("");
           const detailedRequest = await getAgencyRequest(request.id);
           setSelectedRequest(detailedRequest);
           setAgencyRequests((current) => current.map((item) => item.id === detailedRequest.id ? detailedRequest : item));
         }} onOpenDocument={openAgencyRequestDocument} onDownloadDocument={downloadAgencyRequestDocument} onApproveRequest={async (requestId) => {
-          const approvedRequest = await approveAgencyRequest(requestId);
-          setSelectedRequest(approvedRequest);
-          setAgencyRequests((current) => current.map((item) => item.id === approvedRequest.id ? approvedRequest : item));
+          setApproveError("");
+          setApproveSuccess("");
+          setApprovingRequestId(requestId);
+
+          try {
+            const approvedRequest = await approveAgencyRequest(requestId);
+            setSelectedRequest(approvedRequest);
+            setAgencyRequests((current) => current.map((item) => item.id === approvedRequest.id ? approvedRequest : item));
+            setApproveSuccess("L'agence a bien ete enregistree.");
+          } catch (error) {
+            setApproveError(error?.message || "Impossible d'enregistrer cette agence pour le moment.");
+          } finally {
+            setApprovingRequestId(null);
+          }
         }} />}
         {page === "systeme" && <AdminSysteme />}
         {page === "profil" && <AdminProfil onLogout={onLogout} />}
@@ -642,7 +658,7 @@ function AdminAgences({ onViewAgency, adminSearch, setAdminSearch, agencies }) {
   );
 }
 
-function AdminMessages({ requests, selectedRequest, onSelectRequest, onOpenDocument, onDownloadDocument, onApproveRequest }) {
+function AdminMessages({ requests, selectedRequest, approveError, approveSuccess, approvingRequestId, onSelectRequest, onOpenDocument, onDownloadDocument, onApproveRequest }) {
   const activeRequest = selectedRequest || null;
   const isPending = activeRequest?.status === "pending";
 
@@ -693,6 +709,17 @@ function AdminMessages({ requests, selectedRequest, onSelectRequest, onOpenDocum
 
             {activeRequest && (
               <div style={{ display: "grid", gap: 14, padding: 6 }}>
+                {approveError ? (
+                  <div style={{ padding: "12px 14px", borderRadius: 16, background: "rgba(212,5,17,0.08)", border: "1px solid rgba(212,5,17,0.22)", color: S.red, fontSize: 14, lineHeight: 1.6 }}>
+                    {approveError}
+                  </div>
+                ) : null}
+                {approveSuccess ? (
+                  <div style={{ padding: "12px 14px", borderRadius: 16, background: "rgba(26,122,46,0.12)", border: "1px solid rgba(26,122,46,0.22)", color: S.success, fontSize: 14, lineHeight: 1.6 }}>
+                    {approveSuccess}
+                  </div>
+                ) : null}
+
                 <div style={{ padding: "16px 18px", borderRadius: 20, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.78)" }}>
                   <div style={{ fontSize: 20, fontWeight: 700, color: S.text }}>{activeRequest.company}</div>
                   <div style={{ marginTop: 6, color: S.text3, fontSize: 14 }}>{activeRequest.activity} · {activeRequest.city}</div>
@@ -702,9 +729,16 @@ function AdminMessages({ requests, selectedRequest, onSelectRequest, onOpenDocum
                       <button
                         type="button"
                         onClick={() => onApproveRequest(activeRequest.id)}
-                        style={{ ...ghostButtonStyle(), borderColor: S.success, color: S.success }}
+                        disabled={approvingRequestId === activeRequest.id}
+                        style={{
+                          ...ghostButtonStyle(),
+                          borderColor: S.success,
+                          color: S.success,
+                          opacity: approvingRequestId === activeRequest.id ? 0.7 : 1,
+                          cursor: approvingRequestId === activeRequest.id ? "wait" : "pointer",
+                        }}
                       >
-                        Enregistrer l'agence
+                        {approvingRequestId === activeRequest.id ? "Enregistrement..." : "Enregistrer l'agence"}
                       </button>
                     )}
                   </div>

@@ -12,6 +12,7 @@ import bmwImg from "../assets/bmw-x5-30d-2019-08_1.jpg";
 import kiaImg from "../assets/kia.png";
 import hiluxImg from "../assets/toyotahilux.png";
 import peugeot3008Img from "../assets/3008.png";
+import { formatMoney, getPricingDetails } from "../utils/pricing";
 
 const vehicleImages = {
   'landcruiser.jpg': landcruiserImg,
@@ -697,11 +698,9 @@ function VntPayment({ vehicle, user, onBack, onClose, onNotif, onCreatePurchaseR
   const [tel, setTel] = useState('');
   const [cni, setCni] = useState('');
 
-  const frais = (() => {
-    let f = vehicle.price < 5000000 ? 75000 : vehicle.price < 10000000 ? 150000 : vehicle.price < 20000000 ? 250000 : 400000;
-    if((vehicle.specs.find(s=>s.label==='Classe')||{}).val==='Luxe') f = Math.round(f*1.5);
-    return f;
-  })();
+  const pricing = getPricingDetails("sale", vehicle.price);
+  const frais = pricing?.adminShare || 0;
+  const totalAvecCommission = Number(vehicle.price || 0) + frais;
 
   const confirm = async () => {
     if(!cgu||!fraisAck){onNotif({icon:'⚠️',title:'Conditions requises',msg:'Veuillez accepter toutes les conditions avant de procéder.'});return;}
@@ -742,12 +741,12 @@ function VntPayment({ vehicle, user, onBack, onClose, onNotif, onCreatePurchaseR
             <div style={paymentEyebrowStyle(S.vntText)}>Reservation d'achat</div>
             <div style={{fontSize:isMobile ? 24 : 30,fontWeight:800,color:S.text,lineHeight:1.05}}>Sécurisez votre dossier avant la prise de contact</div>
             <div style={{fontSize:13,color:S.text2,lineHeight:1.7,marginTop:10,maxWidth:560}}>
-              Les frais de service sont regles ici, puis le reste de la transaction se poursuit directement avec le concessionnaire.
+              La commission plateforme est calculee automatiquement selon la grille Car Express. Le reste de la transaction se poursuit directement avec le concessionnaire.
             </div>
           </div>
           <div style={paymentAmountBadgeStyle(S.vntText, S.vntLight)}>
-            <span style={{fontSize:10,letterSpacing:'0.14em',textTransform:'uppercase',opacity:0.8}}>Frais plateforme</span>
-            <strong style={{fontSize:isMobile ? 20 : 24,fontFamily:'DM Mono,monospace'}}>{frais.toLocaleString('fr-FR')} F CFA</strong>
+            <span style={{fontSize:10,letterSpacing:'0.14em',textTransform:'uppercase',opacity:0.8}}>Commission plateforme</span>
+            <strong style={{fontSize:isMobile ? 20 : 24,fontFamily:'DM Mono,monospace'}}>{formatMoney(frais)} F CFA</strong>
           </div>
         </div>
         <div style={{marginTop:18,background:'rgba(255,255,255,0.78)',border:`1px solid ${S.vntMid}`,borderRadius:24,padding:isMobile ? 16 : 18,boxShadow:'0 18px 38px rgba(122,92,0,0.08)'}}>
@@ -757,16 +756,16 @@ function VntPayment({ vehicle, user, onBack, onClose, onNotif, onCreatePurchaseR
           <div>🏢 {vehicle.agency}</div>
         </div>
         <div style={{borderTop:`1px dashed ${S.vntMid}`,marginTop:10,paddingTop:10}}>
-          <Row label="Prix du véhicule" val={vehicle.price.toLocaleString('fr-FR')+' F CFA'}/>
-          <Row label="Frais de service Car Express" val={frais.toLocaleString('fr-FR')+' F CFA'} accent={S.vntText}/>
+          <Row label="Prix du véhicule" val={formatMoney(vehicle.price)+' F CFA'}/>
+          <Row label={`Commission Car Express${pricing ? ` (${pricing.percentage}%)` : ''}`} val={formatMoney(frais)+' F CFA'} accent={S.vntText}/>
           <div style={{background:S.vntLight,border:`1px solid ${S.vntMid}`,borderRadius:8,padding:'8px 10px',margin:'8px 0',fontSize:11,color:S.vntText,lineHeight:1.5}}>
-            ⚠️ Les frais de service sont <strong>non remboursables</strong> après validation.
+            ⚠️ La commission plateforme est <strong>non remboursable</strong> après validation.
           </div>
           <div style={{borderTop:`1px dashed ${S.vntMid}`,paddingTop:10,marginTop:6,display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
-            <span style={{fontSize:12,fontWeight:500,color:S.text3}}>TOTAL PLATEFORME</span>
-            <span style={{fontSize:22,fontWeight:600,color:S.vntText,fontFamily:'DM Mono,monospace'}}>{frais.toLocaleString('fr-FR')} F CFA</span>
+            <span style={{fontSize:12,fontWeight:500,color:S.text3}}>TOTAL AVEC COMMISSION</span>
+            <span style={{fontSize:22,fontWeight:600,color:S.vntText,fontFamily:'DM Mono,monospace'}}>{formatMoney(totalAvecCommission)} F CFA</span>
           </div>
-          <div style={{fontSize:11,color:S.text3,marginTop:4,fontStyle:'italic'}}>Le solde sera réglé directement avec le concessionnaire.</div>
+          <div style={{fontSize:11,color:S.text3,marginTop:4,fontStyle:'italic'}}>Prix du vehicule: {formatMoney(vehicle.price)} F CFA. Commission plateforme a regler ici: {formatMoney(frais)} F CFA.</div>
         </div>
         </div>
       </div>
@@ -784,11 +783,11 @@ function VntPayment({ vehicle, user, onBack, onClose, onNotif, onCreatePurchaseR
           Le concessionnaire s'engage à fournir un véhicule conforme à la description. L'acheteur dispose d'un délai d'inspection de 48h après prise en main.
         </div>
         <CheckRow checked={cgu} onChange={setCgu} label={<>J'accepte les <u>CGU Car Express</u> et les <u>conditions du concessionnaire</u></>}/>
-        <CheckRow checked={fraisAck} onChange={setFraisAck} label={<>Je reconnais que les <strong>frais de service sont non remboursables</strong></>}/>
+        <CheckRow checked={fraisAck} onChange={setFraisAck} label={<>Je reconnais que la <strong>commission plateforme est non remboursable</strong></>}/>
       </FormCard>
       </div>
       <div>
-      <FormCard title="Paiement des frais de service" tone="vnt" subtitle="Une fois valides, les frais sont immediatement enregistres.">
+      <FormCard title="Paiement de la commission plateforme" tone="vnt" subtitle="Une fois validee, la commission est immediatement enregistree.">
         {[{key:'carte',icon:'💳',label:'Carte bancaire',sub:'Visa, Mastercard'},
           {key:'mobile',icon:'📱',label:'Mobile Money',sub:'Wave ou Orange Money'}
         ].map(m=>(
@@ -799,26 +798,26 @@ function VntPayment({ vehicle, user, onBack, onClose, onNotif, onCreatePurchaseR
           }} accent={S.vnt} accentText={S.vntText}/>
         ))}
         {payMethod==='mobile' && (
-          <PaymentDetailsCard title="Mobile Money" subtitle="Les frais de service sont payes depuis votre portefeuille mobile.">
+          <PaymentDetailsCard title="Mobile Money" subtitle="La commission plateforme est payee depuis votre portefeuille mobile.">
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(2, minmax(0, 1fr))',columnGap:isMobile?12:20,rowGap:10}}>
               <ProviderOption label="Wave" selected={mobileProvider==='wave'} onClick={()=>setMobileProvider('wave')} accent={S.vntText} light={S.vntLight} />
               <ProviderOption label="Orange Money" selected={mobileProvider==='orange'} onClick={()=>setMobileProvider('orange')} accent={S.vntText} light={S.vntLight} />
             </div>
             <div style={{marginTop:12,display:'grid',gap:10}}>
               <FormField label="Numéro mobile *"><Input type="tel" placeholder="+221 77 000 00 00" value={mobileNumber} onChange={e=>setMobileNumber(e.target.value)} style={paymentInputStyle()}/></FormField>
-              <FormField label="Montant"><Input value={`${frais.toLocaleString('fr-FR')} F CFA`} onChange={()=>{}} style={{...paymentInputStyle(), background:'rgba(24,21,18,0.04)', color:S.text2}}/></FormField>
+              <FormField label="Montant"><Input value={`${formatMoney(frais)} F CFA`} onChange={()=>{}} style={{...paymentInputStyle(), background:'rgba(24,21,18,0.04)', color:S.text2}}/></FormField>
             </div>
           </PaymentDetailsCard>
         )}
         {payMethod==='carte' && (
-          <PaymentDetailsCard title="Carte bancaire" subtitle="Les frais de service sont payes en ligne. Une verification supplementaire peut etre demandee par la banque.">
+          <PaymentDetailsCard title="Carte bancaire" subtitle="La commission plateforme est payee en ligne. Une verification supplementaire peut etre demandee par la banque.">
             <div style={{display:'grid',gap:10}}>
               <FormField label="Nom sur la carte *"><Input placeholder="Prénom et nom" value={cardName} onChange={e=>setCardName(e.target.value)} style={paymentInputStyle()}/></FormField>
               <FormField label="Numéro de carte *"><Input placeholder="1234 5678 9012 3456" value={cardNumber} onChange={e=>setCardNumber(e.target.value)} style={paymentInputStyle()}/></FormField>
               <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'minmax(0,1fr) minmax(0,0.8fr) minmax(0,0.7fr)',columnGap:isMobile?12:20,rowGap:10}}>
                 <FormField label="Expiration *"><Input placeholder="MM/AA" value={cardExpiry} onChange={e=>setCardExpiry(e.target.value)} style={paymentInputStyle()}/></FormField>
                 <FormField label="CVV *"><Input placeholder="123" value={cardCvv} onChange={e=>setCardCvv(e.target.value)} style={paymentInputStyle()}/></FormField>
-                <FormField label="Montant"><Input value={`${frais.toLocaleString('fr-FR')} F CFA`} onChange={()=>{}} style={{...paymentInputStyle(), background:'rgba(24,21,18,0.04)', color:S.text2}}/></FormField>
+                <FormField label="Montant"><Input value={`${formatMoney(frais)} F CFA`} onChange={()=>{}} style={{...paymentInputStyle(), background:'rgba(24,21,18,0.04)', color:S.text2}}/></FormField>
               </div>
             </div>
           </PaymentDetailsCard>
@@ -826,7 +825,7 @@ function VntPayment({ vehicle, user, onBack, onClose, onNotif, onCreatePurchaseR
       </FormCard>
       <FormCard title="Apres validation" tone="neutral" subtitle="Les prochaines etapes de votre achat.">
         <div style={{display:'grid',gap:10}}>
-          <MiniStep>Les frais de service sont regles dans l'application.</MiniStep>
+          <MiniStep>La commission plateforme est reglee dans l'application.</MiniStep>
           <MiniStep>Le dossier est transmis au concessionnaire.</MiniStep>
           <MiniStep>Le solde du vehicule est traite directement avec le vendeur.</MiniStep>
         </div>

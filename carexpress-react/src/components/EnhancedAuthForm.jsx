@@ -1,10 +1,25 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useResponsive } from "../hooks/useResponsive";
 import { getPricingBands } from "../utils/pricing";
 import logo from "../assets/logofinal.png";
 import landcruiserImg from "../assets/landcruiser.jpg";
 import bmwImg from "../assets/bmw-x5-30d-2019-08_1.jpg";
 import sprinterImg from "../assets/mercedes sprinter.jpg";
+
+function normalizeFieldErrors(errors = {}) {
+  return Object.entries(errors).reduce((accumulator, [key, value]) => {
+    const normalizedKey = key.startsWith("documents")
+      ? "documents"
+      : key === "manager_name"
+        ? "managerName"
+        : key === "password_confirmation"
+          ? "confirmPassword"
+          : key;
+
+    accumulator[normalizedKey] = Array.isArray(value) ? value[0] : value;
+    return accumulator;
+  }, {});
+}
 
 const roleConfig = {
   client: {
@@ -204,7 +219,7 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
       }
     } catch (submitError) {
       setError(submitError?.message || "Une erreur est survenue.");
-      setFieldErrors((current) => ({ ...current, ...(submitError?.fieldErrors || {}) }));
+      setFieldErrors((current) => ({ ...current, ...normalizeFieldErrors(submitError?.fieldErrors || {}) }));
     } finally {
       setIsLoading(false);
     }
@@ -587,10 +602,10 @@ function TarificationModal({ onClose }) {
                 <div style={styles.tariffHead}>Prix</div>
                 <div style={styles.tariffHead}>%</div>
                 {section.rows.map((row) => (
-                  <div key={row.label} style={styles.tariffCell}>
-                    <span>{row.label}</span>
-                    <strong>{row.percentage}%</strong>
-                  </div>
+                  <Fragment key={row.label}>
+                    <div key={`${row.label}-label`} style={styles.tariffPrice}>{row.label}</div>
+                    <div key={`${row.label}-rate`} style={styles.tariffRate}>{row.percentage}%</div>
+                  </Fragment>
                 ))}
               </div>
             </div>
@@ -1144,8 +1159,18 @@ const styles = {
     paddingBottom: 8,
     borderBottom: "1px solid rgba(255,255,255,0.08)",
   },
-  tariffCell: {
-    display: "contents",
+  tariffPrice: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 15,
+    lineHeight: 1.6,
+    paddingTop: 6,
+  },
+  tariffRate: {
+    color: "#ffcc00",
+    fontSize: 15,
+    fontWeight: 800,
+    textAlign: "right",
+    paddingTop: 6,
   },
   tariffNotice: {
     padding: "14px 16px",

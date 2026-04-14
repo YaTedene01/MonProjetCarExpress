@@ -53,7 +53,8 @@ class ReservationService
         $this->payments->create([
             'reservation_id' => $reservation->id,
             'amount' => $totalAmount,
-            'method' => $reservation->payment_method,
+            'currency' => 'XOF',
+            'method' => $reservation->payment_method?->value ?? $reservation->payment_method,
             'status' => 'paid',
             'paid_at' => now(),
             'reference' => GenererReference::paiementReservation(),
