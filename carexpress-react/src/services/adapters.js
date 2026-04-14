@@ -1,3 +1,5 @@
+import { getPricingDetails } from "../utils/pricing";
+
 const imageByKeyword = [
   { keywords: ["land cruiser", "prado"], image: "landcruiser.jpg", emoji: "🚙" },
   { keywords: ["sprinter"], image: "mercedes sprinter.jpg", emoji: "🚐" },

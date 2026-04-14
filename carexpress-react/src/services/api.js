@@ -53,7 +53,10 @@ export async function apiRequest(path, options = {}) {
   }
 
   if (!response.ok) {
-    const error = new Error(payload?.message || "Une erreur est survenue lors de l'appel API.");
+    const firstFieldError = payload?.errors
+      ? Object.values(payload.errors).flat().find(Boolean)
+      : null;
+    const error = new Error(firstFieldError || payload?.message || "Une erreur est survenue lors de l'appel API.");
     error.status = response.status;
     error.payload = payload;
     error.fieldErrors = payload?.errors || {};

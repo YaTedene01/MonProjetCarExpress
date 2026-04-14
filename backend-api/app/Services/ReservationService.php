@@ -2,9 +2,13 @@
 
 namespace App\Services;
 
+use App\Enums\ListingType;
 use App\Enums\UserRole;
+use App\Enums\VehicleStatus;
+use App\Exceptions\ApiException;
 use App\Models\Alert;
 use App\Models\User;
+use App\Models\Vehicle;
 use App\Repository\PaymentRepository;
 use App\Repository\ReservationRepository;
 use App\Utils\GenererReference;
@@ -17,8 +21,22 @@ class ReservationService
         private readonly PaymentRepository $payments
     ) {}
 
-    public function creer(array $data, object $vehicle, int $clientId)
+    public function creer(array $data, Vehicle $vehicle, int $clientId)
     {
+        if (($vehicle->listing_type?->value ?? $vehicle->listing_type) !== ListingType::Rental->value) {
+            throw new ApiException('Ce vehicule n est pas disponible a la location.', 422);
+        }
+
+        if (($vehicle->status?->value ?? $vehicle->status) !== VehicleStatus::Available->value) {
+            throw new ApiException('Ce vehicule n est pas disponible a la reservation pour le moment.', 422);
+        }
+
+        if ($this->reservations->hasOverlap($vehicle->id, $data['pickup_date'], $data['return_date'])) {
+            throw new ApiException('Ce vehicule est deja reserve sur la periode selectionnee.', 422, [
+                'pickup_date' => ['Le vehicule n est pas disponible sur cette periode.'],
+            ]);
+        }
+
         $daysCount = Carbon::parse($data['pickup_date'])->diffInDays(Carbon::parse($data['return_date']));
         $totalAmount = $daysCount * (float) $vehicle->price;
 

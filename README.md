@@ -1,74 +1,127 @@
 # MonProjetCarExpress
 
-Plateforme web complète pour la location et l'achat de véhicules, avec trois espaces:
+Plateforme web complète de location et d'achat de véhicules avec trois espaces métier:
 
 - `Client`
 - `Agence`
 - `Super Admin`
 
-Le projet est composé de:
+Le projet repose sur une architecture full-stack simple à lancer en local:
 
-- un frontend React/Vite (`carexpress-react`)
-- une API Laravel (`backend-api`)
-- une base PostgreSQL
-- une stack Docker unifiée pour exécution et déploiement
-
----
+- un frontend React + Vite dans [`carexpress-react`](/home/ya-tedene/Téléchargements/MonProjetCarExpress/carexpress-react)
+- une API Laravel dans [`backend-api`](/home/ya-tedene/Téléchargements/MonProjetCarExpress/backend-api)
+- une base de données PostgreSQL
+- une stack Docker avec gateway Nginx
 
 ## Sommaire
 
+- [Fonctionnalités](#fonctionnalités)
 - [Architecture](#architecture)
 - [Prérequis](#prérequis)
-- [Démarrage rapide (Docker recommandé)](#démarrage-rapide-docker-recommandé)
-- [Lancement en mode dev sans Docker](#lancement-en-mode-dev-sans-docker)
+- [Démarrage rapide avec Docker](#démarrage-rapide-avec-docker)
+- [Lancement en développement sans Docker](#lancement-en-développement-sans-docker)
 - [Variables d'environnement](#variables-denvironnement)
 - [Comptes de démonstration](#comptes-de-démonstration)
-- [Déploiement](#déploiement)
 - [Commandes utiles](#commandes-utiles)
-- [Troubleshooting](#troubleshooting)
-- [Documentation détaillée](#documentation-détaillée)
+- [Déploiement](#déploiement)
+- [Documentation complémentaire](#documentation-complémentaire)
 
----
+## Fonctionnalités
+
+- Catalogue public de véhicules à louer ou à acheter
+- Authentification séparée pour client, agence et super admin
+- Gestion du profil client et de l'agence
+- Réservations de véhicules côté client avec vérification de disponibilité, contrôle des chevauchements et validation métier
+- Demandes d'achat côté client
+- Gestion des véhicules, réservations et demandes d'achat côté agence
+- Workflow agence avec demande d'enregistrement, validation admin, première connexion puis activation du compte
+- Boutons et accès d'administration conditionnés par le statut réel de l'agence
+- Tarification centralisée pour les annonces de location et d'achat, avec calcul automatique de la part administration
+- Affichage des conditions et tarifications côté agence avant l'envoi d'une demande
+- Documentation API OpenAPI / Swagger
+
+## Règles métier importantes
+
+### Réservations location
+
+- Un client ne peut réserver qu'un véhicule de location réellement disponible
+- Une réservation est refusée si les dates se chevauchent avec une réservation `pending` ou `confirmed`
+- Les heures choisies côté client sont transmises à l'API et conservées dans la réservation
+
+### Cycle de vie d'une agence
+
+- Une agence peut envoyer une demande d'enregistrement avec ses informations administratives, son logo, ses documents et son mot de passe
+- Quand l'admin enregistre cette demande, les informations de l'agence créée reprennent celles transmises dans la demande
+- Après enregistrement par l'admin, l'agence reste en statut `pending`
+- Le statut passe à `active` lors de la première connexion réussie de l'agence
+- Tant qu'une agence n'a pas encore effectué cette première connexion, le bouton `Voir` côté admin reste désactivé
+- Tant qu'une agence n'a pas encore créé d'annonces, son espace agence n'affiche aucun véhicule
+
+### Tarification agence
+
+La commission administration est calculée automatiquement à partir du prix saisi par l'agence.
+
+#### Location
+
+| Prix | % admin |
+| --- | ---: |
+| 20.000 à 29.000 F CFA / jour | 15% |
+| 30.000 à 39.000 F CFA / jour | 20% |
+| 40.000 à 49.000 F CFA / jour | 25% |
+| 50.000 à 100.000 F CFA / jour | 30% |
+| 100.000 F CFA / jour et + | 35% |
+
+#### Achat
+
+| Prix | % admin |
+| --- | ---: |
+| 500.000 à 1.000.000 F CFA | 15% |
+| 1.000.000 à 2.000.000 F CFA | 20% |
+| 2.000.000 à 3.000.000 F CFA | 25% |
+| 3.000.000 à 4.999.999 F CFA | 30% |
+| 5.000.000 F CFA et + | 35% |
+
+Note:
+- la part admin est affichée à l'agence dans le formulaire d'annonce
+- le montant admin est recalculé côté backend à chaque création ou modification d'annonce
+- un prix hors grille est refusé
 
 ## Architecture
 
 ```text
-Utilisateur
+Navigateur
    |
    v
-Nginx Gateway (docker service: gateway)
-   |--------------------> Frontend React (docker service: frontend)
+Nginx Gateway (service: gateway)
+   |--------------------> Frontend React (service: frontend)
    |
-   \--------------------> API Laravel (docker service: backend) ---> PostgreSQL (docker service: db)
+   \--------------------> API Laravel (service: backend) ---> PostgreSQL (service: db)
 ```
 
 Routage principal:
 
 - `/` -> frontend
-- `/api/*` -> backend
+- `/api/v1/*` -> API applicative
+- `/api/documentation` -> interface Swagger
+- `/api/docs/openapi.json` -> schéma OpenAPI JSON
 - `/up` -> healthcheck backend
-- `/api/documentation` -> Swagger API
-
----
 
 ## Prérequis
 
-### Pour Docker (recommandé)
+### Avec Docker
 
 - Docker
 - Docker Compose v2
 
-### Pour dev local sans Docker
+### Sans Docker
 
 - Node.js 18+
 - npm
 - PHP 8.3+
 - Composer
-- PostgreSQL 15+
+- PostgreSQL 16 recommandé
 
----
-
-## Démarrage rapide (Docker recommandé)
+## Démarrage rapide avec Docker
 
 Depuis la racine du projet:
 
@@ -77,36 +130,25 @@ cp .env.docker.example .env
 docker compose up -d --build
 ```
 
-Accès:
+Une fois la stack démarrée:
 
 - Frontend: `http://localhost`
 - API: `http://localhost/api/v1`
 - Swagger: `http://localhost/api/documentation`
+- OpenAPI JSON: `http://localhost/api/docs/openapi.json`
 - Healthcheck: `http://localhost/up`
 
-Voir les logs:
+Commandes utiles:
 
 ```bash
 docker compose logs -f
-```
-
-Arrêter:
-
-```bash
 docker compose down
-```
-
-Arrêter + supprimer les volumes DB:
-
-```bash
 docker compose down -v
 ```
 
----
+## Lancement en développement sans Docker
 
-## Lancement en mode dev sans Docker
-
-### 1) Backend API
+### Backend Laravel
 
 ```bash
 cd backend-api
@@ -117,9 +159,16 @@ php artisan migrate --seed
 php artisan serve
 ```
 
-Backend disponible sur `http://127.0.0.1:8000`.
+API disponible sur `http://127.0.0.1:8000`.
 
-### 2) Frontend
+Option utile pour préparer rapidement le backend:
+
+```bash
+cd backend-api
+composer run setup
+```
+
+### Frontend React
 
 ```bash
 cd carexpress-react
@@ -130,13 +179,13 @@ npm run dev
 
 Frontend disponible sur `http://127.0.0.1:5173`.
 
----
+En mode local sans gateway Docker, la variable `VITE_API_BASE_URL` doit généralement pointer vers `http://127.0.0.1:8000`.
 
 ## Variables d'environnement
 
-### Racine (`.env` utilisé par `docker compose`)
+### Racine du projet (`.env` pour Docker Compose)
 
-Exemple complet: [`.env.docker.example`](/home/ya-tedene/Téléchargements/MonProjetCarExpress/.env.docker.example)
+Copiez [`.env.docker.example`](/home/ya-tedene/Téléchargements/MonProjetCarExpress/.env.docker.example) vers `.env`.
 
 Variables importantes:
 
@@ -145,116 +194,104 @@ Variables importantes:
 - `POSTGRES_DB`
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`
-- `VITE_API_BASE_URL` (laisser vide pour same-origin via gateway)
+- `GATEWAY_PORT`
+- `VITE_API_BASE_URL`
 - `CORS_ALLOWED_ORIGINS`
 - `SANCTUM_STATEFUL_DOMAINS`
 
+Conseil:
+
+- en Docker via la gateway Nginx, laissez `VITE_API_BASE_URL=` vide pour utiliser les appels same-origin vers `/api/v1`
+
 ### Backend (`backend-api/.env`)
 
-Référence: [`backend-api/.env.example`](/home/ya-tedene/Téléchargements/MonProjetCarExpress/backend-api/.env.example)
+Fichier de référence: [`backend-api/.env.example`](/home/ya-tedene/Téléchargements/MonProjetCarExpress/backend-api/.env.example)
+
+Variables clés:
+
+- `APP_URL`
+- `DB_HOST`
+- `DB_PORT`
+- `DB_DATABASE`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `DB_SSLMODE`
+- `L5_SWAGGER_CONST_HOST`
+- `PORT`
 
 ### Frontend (`carexpress-react/.env`)
 
-Référence: [`carexpress-react/.env.example`](/home/ya-tedene/Téléchargements/MonProjetCarExpress/carexpress-react/.env.example)
+Fichier de référence: [`carexpress-react/.env.example`](/home/ya-tedene/Téléchargements/MonProjetCarExpress/carexpress-react/.env.example)
 
----
+Variable principale:
+
+- `VITE_API_BASE_URL`
 
 ## Comptes de démonstration
 
-- Admin: `admin@carexpress.sn` / `admin12345`
+Comptes présents dans les seeders:
+
+- Super Admin: `admin@carexpress.sn` / `admin12345`
 - Client: `client@carexpress.sn` / `client12345`
 - Agence: `agency+dakar-auto-services@carexpress.sn` / `agency12345`
 
----
+Compte provisoire créé par l'admin:
+
+- lorsqu'une agence est enregistrée manuellement depuis l'espace admin, un compte partenaire est créé avec le mot de passe provisoire `agency12345`
+- ce compte reste en attente jusqu'à sa première connexion réussie
+
+## Commandes utiles
+
+Depuis la racine:
+
+```bash
+docker compose up -d --build
+docker compose up -d --build backend
+docker compose exec backend php artisan migrate --force
+docker compose exec backend php artisan db:seed --force
+docker compose exec backend sh
+```
+
+Depuis `backend-api`:
+
+```bash
+composer test
+php artisan test
+php artisan test --filter=TarificationServiceTest
+```
+
+Depuis `carexpress-react`:
+
+```bash
+npm run dev
+npm run build
+```
 
 ## Déploiement
 
-Guide détaillé: [DEPLOYMENT.md](/home/ya-tedene/Téléchargements/MonProjetCarExpress/DEPLOYMENT.md)
+Un guide plus détaillé est disponible ici: [DEPLOYMENT.md](/home/ya-tedene/Téléchargements/MonProjetCarExpress/DEPLOYMENT.md)
 
-### Déploiement VPS (résumé)
+Résumé:
 
 ```bash
 git clone <repo>
 cd MonProjetCarExpress
 cp .env.docker.example .env
-# éditer .env
 docker compose up -d --build
 ```
 
-Pour HTTPS, placez un reverse proxy TLS devant la stack (`Nginx Proxy Manager`, `Traefik`, `Caddy`, etc.).
+Pour une mise en production, placez idéalement un reverse proxy TLS devant la stack pour gérer HTTPS.
 
----
-
-## Commandes utiles
-
-Rebuild complet:
-
-```bash
-docker compose up -d --build
-```
-
-Rebuild backend uniquement:
-
-```bash
-docker compose up -d --build backend
-```
-
-Migrations manuelles:
-
-```bash
-docker compose exec backend php artisan migrate --force
-```
-
-Accéder au shell backend:
-
-```bash
-docker compose exec backend sh
-```
-
----
-
-## Troubleshooting
-
-### Le backend ne démarre pas (DB pas prête)
-
-Le script de démarrage backend fait déjà des retries migration. Vérifiez:
-
-```bash
-docker compose logs -f backend db
-```
-
-### Erreur CORS
-
-Vérifiez dans `.env` (racine ou backend selon mode):
-
-- `CORS_ALLOWED_ORIGINS`
-- `SANCTUM_STATEFUL_DOMAINS`
-
-### Le frontend n’appelle pas la bonne API
-
-En Docker via gateway, laissez `VITE_API_BASE_URL=` vide.
-
-### Port déjà utilisé
-
-Changez `GATEWAY_PORT` dans `.env` puis relancez:
-
-```bash
-docker compose up -d --build
-```
-
----
-
-## Documentation détaillée
+## Documentation complémentaire
 
 - Backend: [backend-api/README.md](/home/ya-tedene/Téléchargements/MonProjetCarExpress/backend-api/README.md)
 - Frontend: [carexpress-react/README.md](/home/ya-tedene/Téléchargements/MonProjetCarExpress/carexpress-react/README.md)
-- Déploiement Docker: [DEPLOYMENT.md](/home/ya-tedene/Téléchargements/MonProjetCarExpress/DEPLOYMENT.md)
+- Déploiement: [DEPLOYMENT.md](/home/ya-tedene/Téléchargements/MonProjetCarExpress/DEPLOYMENT.md)
 
----
+## État du projet
 
-## État actuel
-
-- Docker unifié prêt (`frontend + backend + db + gateway`)
-- API Laravel documentée via Swagger
-- Front React multi-rôles branché sur l'API
-- Flux agence avec validation admin avant connexion
+- Stack Docker unifiée opérationnelle
+- Frontend React multi-rôles
+- API Laravel structurée par domaines et rôles
+- Base PostgreSQL seedée pour démo locale
+- Documentation Swagger intégrée

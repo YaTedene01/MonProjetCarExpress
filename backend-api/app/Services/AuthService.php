@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AgencyStatus;
 use App\Enums\UserRole;
 use App\Models\AgencyRegistrationRequest;
 use App\Repository\AgencyRepository;
@@ -90,10 +91,17 @@ class AuthService
         if ($data['role'] === UserRole::Agency->value) {
             $agencyStatus = $user->agency?->status?->value ?? $user->agency?->status;
 
-            if ($agencyStatus !== 'active') {
+            if ($agencyStatus === AgencyStatus::Suspended->value) {
                 throw ValidationException::withMessages([
-                    'identifier' => ['Votre agence n est pas encore active. Contactez l administration.'],
+                    'identifier' => ['Votre agence est suspendue. Contactez l administration.'],
                 ]);
+            }
+
+            if ($user->agency !== null && $agencyStatus === AgencyStatus::Pending->value) {
+                $user->agency->update([
+                    'status' => AgencyStatus::Active->value,
+                ]);
+                $user->unsetRelation('agency');
             }
         }
 

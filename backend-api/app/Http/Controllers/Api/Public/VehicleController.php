@@ -35,6 +35,25 @@ class VehicleController extends Controller
     {
         $vehicles = Vehicle::query()
             ->with('agency')
+            ->when(
+                ! $request->filled('status'),
+                function ($query): void {
+                    $query->where(function ($catalogueQuery): void {
+                        $catalogueQuery
+                            ->where(function ($rentalQuery): void {
+                                $rentalQuery
+                                    ->where('listing_type', 'rental')
+                                    ->where('status', 'available');
+                            })
+                            ->orWhere(function ($saleQuery): void {
+                                $saleQuery
+                                    ->where('listing_type', 'sale')
+                                    ->where('status', 'for_sale');
+                            });
+                    });
+                },
+                fn ($query) => $query->where('status', $request->string('status'))
+            )
             ->when($request->filled('listing_type'), fn ($query) => $query->where('listing_type', $request->string('listing_type')))
             ->when($request->filled('city'), fn ($query) => $query->where('city', $request->string('city')))
             ->when($request->filled('category'), fn ($query) => $query->where('category', $request->string('category')))

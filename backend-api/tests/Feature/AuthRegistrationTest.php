@@ -61,4 +61,40 @@ class AuthRegistrationTest extends TestCase
             'role' => 'agency',
         ]);
     }
+
+    public function test_pending_agency_can_login_and_becomes_active_on_first_connection(): void
+    {
+        $agency = Agency::query()->create([
+            'name' => 'Agence Test Dakar',
+            'slug' => 'agence-test-dakar',
+            'activity' => 'Location',
+            'city' => 'Dakar',
+            'status' => 'pending',
+        ]);
+
+        User::query()->create([
+            'agency_id' => $agency->id,
+            'role' => 'agency',
+            'name' => 'Agence Test Dakar',
+            'email' => 'contact@agence-test.sn',
+            'phone' => '+221770000333',
+            'city' => 'Dakar',
+            'password' => 'agency12345',
+            'status' => 'active',
+        ]);
+
+        $this->postJson('/api/v1/authentification/agence/connexion', [
+            'identifier' => 'contact@agence-test.sn',
+            'password' => 'agency12345',
+            'device_name' => 'agency-web',
+        ])
+            ->assertOk()
+            ->assertJsonPath('status', true)
+            ->assertJsonPath('data.utilisateur.role', 'agency');
+
+        $this->assertDatabaseHas('agencies', [
+            'id' => $agency->id,
+            'status' => 'active',
+        ]);
+    }
 }

@@ -569,7 +569,7 @@ export default function LandingPage({ onGetStarted }) {
             <div style={{ position: 'relative', zIndex: 1, display: 'grid', gap: 14 }}>
               <div style={styles.actionTitle}>Vous voulez louer une voiture?</div>
               <p style={styles.actionText}>
-                Les agences peuvent ajouter leurs annonces, gerer les demandes et suivre leurs revenus depuis un tableau de bord dedie.
+                Trouvez rapidement le vehicule qui vous convient, choisissez vos dates et envoyez votre demande de reservation en quelques clics.
               </p>
               <button 
                 onClick={onGetStarted} 

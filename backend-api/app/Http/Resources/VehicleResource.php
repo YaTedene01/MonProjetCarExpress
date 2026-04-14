@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\TarificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,6 +10,11 @@ class VehicleResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $pricing = app(TarificationService::class)->describe(
+            (float) $this->price,
+            $this->listing_type?->value ?? $this->listing_type
+        );
+
         return [
             'id' => $this->id,
             'agency_id' => $this->agency_id,
@@ -24,6 +30,8 @@ class VehicleResource extends JsonResource
             'price' => (float) $this->price,
             'price_unit' => $this->price_unit,
             'service_fee' => $this->service_fee !== null ? (float) $this->service_fee : null,
+            'admin_rate' => $pricing['percentage'] ?? null,
+            'admin_share_amount' => $pricing['amount'] ?? ($this->service_fee !== null ? (float) $this->service_fee : null),
             'city' => $this->city,
             'status' => $this->status?->value ?? $this->status,
             'is_featured' => $this->is_featured,

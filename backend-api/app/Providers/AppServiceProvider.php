@@ -13,6 +13,7 @@ use App\Services\AgenceService;
 use App\Services\AuthService;
 use App\Services\DemandeAchatService;
 use App\Services\ReservationService;
+use App\Services\TarificationService;
 use App\Services\VehiculeService;
 use Illuminate\Support\ServiceProvider;
 
@@ -36,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(VehiculeService::class);
         $this->app->singleton(ReservationService::class);
         $this->app->singleton(DemandeAchatService::class);
+        $this->app->singleton(TarificationService::class);
     }
 
     /**

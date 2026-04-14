@@ -7,6 +7,7 @@ import dusterImg from "../assets/duster.jpeg";
 import ChatPanel from "../components/ChatPanel";
 import { createAgencyVehicle, fetchAgencyAlerts, fetchAgencyDashboard, fetchAgencyVehicles, updateAgencyVehicle } from "../services/catalogue";
 import { adaptAgencyVehicleRow } from "../services/adapters";
+import { formatMoney, getPricingBands, getPricingDetails } from "../utils/pricing";
 
 const S = {
   gold: "#f4c95d",
@@ -27,20 +28,9 @@ const S = {
   warning: "#ffcc00",
 };
 
-const initialAgencyVehicles = [
-  { name: "Toyota Prado 2021", detail: "SUV · 7 places · 85 000 F / jour", status: "Disponible", type: "Location", revenue: "340 000 F", views: 128, urgent: false, images: [landcruiserImg] },
-  { name: "Hyundai Tucson 2020", detail: "SUV · 5 places · 65 000 F / jour", status: "Loue", type: "Location", revenue: "520 000 F", views: 94, urgent: false, images: [tucsonImg] },
-  { name: "Kia Sportage 2019", detail: "SUV · 74 000 km · 7 200 000 F", status: "En vente", type: "Vente", revenue: "Frais service 95 000 F", views: 67, urgent: true, images: [kiaImg] },
-  { name: "Renault Duster 2022", detail: "SUV · 5 places · 55 000 F / jour", status: "Disponible", type: "Location", revenue: "165 000 F", views: 88, urgent: false, images: [dusterImg] },
-  { name: "Toyota Hiace 2019", detail: "Minibus · 14 places · 180 000 F / jour", status: "Maintenance", type: "Location", revenue: "0 F", views: 43, urgent: true, images: [landcruiserImg] },
-];
+const initialAgencyVehicles = [];
 
-const agencyAlerts = [
-  { read: false, title: "Nouvelle demande de location", sub: "Toyota Prado · Moussa Diallo · 2 au 5 avril · aeroport DSS", time: "Il y a 18 min", tone: "red" },
-  { read: false, title: "Reservation confirmee", sub: "Hyundai Tucson · depart demain a 09:00 · paiement mobile money", time: "Il y a 1 heure", tone: "gold" },
-  { read: false, title: "Manifestation d'interet achat", sub: "Kia Sportage · 2 acheteurs souhaitent visiter le vehicule", time: "Il y a 3 heures", tone: "gold" },
-  { read: true, title: "Avis client recu", sub: "Toyota Prado · note 4,8/5 apres restitution", time: "Hier", tone: "neutral" },
-];
+const agencyAlerts = [];
 
 const performanceBars = [
   { label: "Lun", value: 64 },
@@ -208,11 +198,17 @@ function AgencyHome({ setPage, vehicles, alerts, onCreateListing, branding, dash
           subtitle="Statut commercial et performance des vehicules"
           right={<ActionLink onClick={() => setPage("annonces")}>Voir toutes les annonces</ActionLink>}
         >
-          <div style={{ display: "grid", gap: 10 }}>
-            {vehicles.slice(0, 4).map((vehicle) => (
-              <VehicleRow key={vehicle.name} vehicle={vehicle} />
-            ))}
-          </div>
+          {vehicles.length > 0 ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              {vehicles.slice(0, 4).map((vehicle) => (
+                <VehicleRow key={vehicle.name} vehicle={vehicle} />
+              ))}
+            </div>
+          ) : (
+            <div style={{ color: S.text3, fontSize: 14 }}>
+              Aucune annonce publiee pour le moment. Creez votre premiere annonce pour voir vos vehicules apparaitre ici.
+            </div>
+          )}
         </Panel>
 
         <Panel
@@ -259,9 +255,9 @@ function AgencyAnnonces({ vehicles, onCreateListing, onEditVehicle, onDeleteVehi
 
         <div style={autoGrid(190, 14)}>
           <SoftMetric label="En ligne" value={String(vehicles.filter((item) => item.status !== "Maintenance").length)} sub="visibles maintenant" />
-          <SoftMetric label="Loue" value="2" sub="en cours de reservation" />
+          <SoftMetric label="Loue" value={String(vehicles.filter((item) => item.status === "Loue").length)} sub="en cours de reservation" />
           <SoftMetric label="En vente" value={String(vehicles.filter((item) => item.type === "Vente").length)} sub="dossiers ouverts" />
-          <SoftMetric label="A relancer" value="4" sub="visiteurs sans suite" />
+          <SoftMetric label="A relancer" value="0" sub="visiteurs sans suite" />
         </div>
       </Panel>
 
@@ -269,45 +265,54 @@ function AgencyAnnonces({ vehicles, onCreateListing, onEditVehicle, onDeleteVehi
         title="Catalogue partenaire"
         subtitle="Un module plus clair pour suivre les annonces, leur statut et leur traction."
       >
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "min(760px, 100%)" }}>
-            <thead>
-              <tr>
-                {["Vehicule", "Type", "Statut", "Vues", "Revenu", "Action"].map((head) => (
-                  <th key={head} style={tableHeadStyle()}>{head}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((vehicle) => (
-                <tr key={vehicle.name}>
-                  <td style={tableCellStyle()}>
-                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                      <div style={{ width: 68, height: 52, borderRadius: 12, overflow: "hidden", background: "rgba(24,21,18,0.06)", flexShrink: 0 }}>
-                        {vehicle.images?.[0] ? <img src={vehicle.images[0]} alt={vehicle.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 600, color: S.text }}>{vehicle.name}</div>
-                        <div style={{ fontSize: 12, color: S.text3, marginTop: 3 }}>{vehicle.detail}</div>
-                        {!!vehicle.images?.length && <div style={{ fontSize: 11, color: S.text3, marginTop: 4 }}>{vehicle.images.length} photo{vehicle.images.length > 1 ? "s" : ""}</div>}
-                      </div>
-                    </div>
-                  </td>
-                  <td style={tableCellStyle()}><Chip tone={vehicle.type === "Vente" ? "gold" : "dark"}>{vehicle.type}</Chip></td>
-                  <td style={tableCellStyle()}><StatusBadge value={vehicle.status} /></td>
-                  <td style={tableCellStyle()}>{vehicle.views}</td>
-                  <td style={tableCellStyle()}>{vehicle.revenue}</td>
-                  <td style={tableCellStyle()}>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button type="button" onClick={() => onEditVehicle(vehicle)} style={ghostButtonStyle()}>Modifier</button>
-                      <button type="button" onClick={() => onDeleteVehicle(vehicle.name)} style={dangerButtonStyle()}>Supprimer</button>
-                    </div>
-                  </td>
+        {filtered.length > 0 ? (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "min(760px, 100%)" }}>
+              <thead>
+                <tr>
+                  {["Vehicule", "Type", "Statut", "Vues", "Revenu", "Action"].map((head) => (
+                    <th key={head} style={tableHeadStyle()}>{head}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filtered.map((vehicle) => (
+                  <tr key={vehicle.name}>
+                    <td style={tableCellStyle()}>
+                      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                        <div style={{ width: 68, height: 52, borderRadius: 12, overflow: "hidden", background: "rgba(24,21,18,0.06)", flexShrink: 0 }}>
+                          {vehicle.images?.[0] ? <img src={vehicle.images[0]} alt={vehicle.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, color: S.text }}>{vehicle.name}</div>
+                          <div style={{ fontSize: 12, color: S.text3, marginTop: 3 }}>{vehicle.detail}</div>
+                          {!!vehicle.images?.length && <div style={{ fontSize: 11, color: S.text3, marginTop: 4 }}>{vehicle.images.length} photo{vehicle.images.length > 1 ? "s" : ""}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td style={tableCellStyle()}><Chip tone={vehicle.type === "Vente" ? "gold" : "dark"}>{vehicle.type}</Chip></td>
+                    <td style={tableCellStyle()}><StatusBadge value={vehicle.status} /></td>
+                    <td style={tableCellStyle()}>{vehicle.views}</td>
+                    <td style={tableCellStyle()}>{vehicle.revenue}</td>
+                    <td style={tableCellStyle()}>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button type="button" onClick={() => onEditVehicle(vehicle)} style={ghostButtonStyle()}>Modifier</button>
+                        <button type="button" onClick={() => onDeleteVehicle(vehicle.name)} style={dangerButtonStyle()}>Supprimer</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState
+            title="Aucune annonce pour le moment"
+            subtitle="Votre catalogue est vide tant que vous n'avez pas cree et publie votre premiere annonce."
+            actionLabel="Creer une annonce"
+            onAction={onCreateListing}
+          />
+        )}
       </Panel>
     </div>
   );
@@ -626,6 +631,16 @@ function VehicleRow({ vehicle }) {
   );
 }
 
+function EmptyState({ title, subtitle, actionLabel, onAction }) {
+  return (
+    <div style={{ display: "grid", gap: 12, justifyItems: "start", padding: "10px 0" }}>
+      <div style={{ fontSize: 16, fontWeight: 700, color: S.text }}>{title}</div>
+      <div style={{ fontSize: 14, lineHeight: 1.7, color: S.text3, maxWidth: 560 }}>{subtitle}</div>
+      {actionLabel ? <Btn small onClick={onAction} style={{ width: "auto", paddingInline: 18 }}>{actionLabel}</Btn> : null}
+    </div>
+  );
+}
+
 function AlertRow({ alert }) {
   const toneColor = alert.tone === "red" ? S.red : alert.tone === "gold" ? "#8b6800" : S.text3;
   const toneBg = alert.tone === "red" ? S.redSoft : alert.tone === "gold" ? S.goldSoft : "rgba(24,21,18,0.04)";
@@ -835,6 +850,7 @@ function toAgencyVehiclePayload(listing) {
   const words = (listing.name || "").trim().split(/\s+/);
   const brand = words[0] || "Marque";
   const model = words.slice(1).join(" ") || listing.category || "Modele";
+  const pricing = getPricingDetails(type, Number(listing.price || 0));
 
   return {
     listing_type: type,
@@ -846,7 +862,7 @@ function toAgencyVehiclePayload(listing) {
     class_name: listing.type === "Vente" ? "Standard" : "Location",
     price: Number(listing.price || 0),
     price_unit: type === "sale" ? "fixed" : "day",
-    service_fee: type === "sale" ? 95000 : null,
+    service_fee: pricing?.adminShare ?? null,
     city: listing.city || "Dakar",
     status,
     summary: listing.detail,
@@ -865,6 +881,7 @@ function NewListingModal({ onClose, onSubmit, initialData }) {
   });
   const [errors, setErrors] = useState({});
   const [photoError, setPhotoError] = useState("");
+  const pricing = getPricingDetails(form.type === "Vente" ? "sale" : "rental", Number(form.price || 0));
 
   const update = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -887,6 +904,11 @@ function NewListingModal({ onClose, onSubmit, initialData }) {
     ["name", "detail", "price"].forEach((key) => {
       if (!form[key]) nextErrors[key] = "Champ requis.";
     });
+    if (form.price && !pricing) {
+      nextErrors.price = form.type === "Vente"
+        ? "Le prix de vente doit respecter la grille Car Express a partir de 500 000 F CFA."
+        : "Le prix location doit respecter la grille Car Express a partir de 20 000 F CFA / jour.";
+    }
     if (!form.photos?.length) setPhotoError("Ajoutez au moins une photo.");
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0 || !form.photos?.length) return;
@@ -899,7 +921,9 @@ function NewListingModal({ onClose, onSubmit, initialData }) {
       commercialDetail: form.detail,
       status,
       type: form.type,
-      revenue: initialData?.revenue || (form.type === "Vente" ? "Frais service a venir" : "Nouvelle annonce"),
+      revenue: pricing
+        ? `${pricing.percentage}% admin · ${formatMoney(pricing.adminShare)} F${form.type === "Vente" ? "" : " / jour"}`
+        : (initialData?.revenue || "Nouvelle annonce"),
       views: initialData?.views ?? 0,
       urgent: initialData?.urgent ?? false,
       images: form.photos.map((photo) => photo.url),
@@ -958,6 +982,35 @@ function NewListingModal({ onClose, onSubmit, initialData }) {
             </FormFieldBlock>
           </div>
 
+          <div style={{ display: "grid", gap: 14, padding: 16, borderRadius: 20, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.74)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", color: S.text3, marginBottom: 6 }}>Tarification Car Express</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: S.text }}>
+                  {form.type === "Vente" ? "Commission admin sur achat" : "Commission admin sur location"}
+                </div>
+              </div>
+            </div>
+            {pricing ? (
+              <div style={{ display: "grid", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                  <TariffMetric label="Prix saisi" value={`${formatMoney(pricing.price)} F CFA${form.type === "Vente" ? "" : " / jour"}`} />
+                  <TariffMetric label="Part admin" value={`${pricing.percentage}%`} />
+                  <TariffMetric label="Montant admin" value={`${formatMoney(pricing.adminShare)} F CFA${form.type === "Vente" ? "" : " / jour"}`} />
+                  <TariffMetric label="Reste agence" value={`${formatMoney(pricing.agencyNet)} F CFA${form.type === "Vente" ? "" : " / jour"}`} />
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.7, color: S.text2 }}>
+                  Pour cette annonce, l'administration recevra <strong>{pricing.percentage}%</strong>, soit <strong>{formatMoney(pricing.adminShare)} F CFA{form.type === "Vente" ? "" : " / jour"}</strong>.
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, lineHeight: 1.7, color: S.red }}>
+                Le prix saisi est hors grille Car Express. Respectez la fourchette minimale de {form.type === "Vente" ? "500 000 F CFA" : "20 000 F CFA / jour"}.
+              </div>
+            )}
+            <TariffBandsTable type={form.type === "Vente" ? "sale" : "rental"} />
+          </div>
+
           <FormFieldBlock label="Photos du vehicule" error={photoError}>
             <div style={{ display: "grid", gap: 12 }}>
               <label style={{ ...modalUploadStyle(), cursor: "pointer" }}>
@@ -988,6 +1041,11 @@ function NewListingModal({ onClose, onSubmit, initialData }) {
             <div style={{ marginTop: 6, color: S.text3, fontSize: 13 }}>
               {form.category} · {form.seats} places · {form.type === "Vente" ? `${form.price || "0"} F` : `${form.price || "0"} F / jour`}
             </div>
+            {pricing ? (
+              <div style={{ marginTop: 8, fontSize: 12, color: S.text2 }}>
+                Commission admin: <strong>{pricing.percentage}%</strong> · {formatMoney(pricing.adminShare)} F CFA{form.type === "Vente" ? "" : " / jour"}
+              </div>
+            ) : null}
             {!!form.photos?.length && (
               <div style={{ marginTop: 12, width: 120, height: 86, borderRadius: 14, overflow: "hidden", border: `1px solid ${S.border}` }}>
                 <img src={form.photos[0].url} alt="Apercu annonce" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -1015,6 +1073,35 @@ function FormFieldBlock({ label, children, error }) {
       {children}
       {error ? <span style={{ fontSize: 12, color: S.red }}>{error}</span> : null}
     </label>
+  );
+}
+
+function TariffMetric({ label, value }) {
+  return (
+    <div style={{ padding: "12px 14px", borderRadius: 16, border: `1px solid ${S.border}`, background: "#fff" }}>
+      <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: S.text3 }}>{label}</div>
+      <div style={{ marginTop: 6, fontSize: 16, fontWeight: 700, color: S.text }}>{value}</div>
+    </div>
+  );
+}
+
+function TariffBandsTable({ type }) {
+  const rows = getPricingBands(type);
+
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", color: S.text3 }}>Grille de reference</div>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, alignItems: "center" }}>
+        <div style={{ fontSize: 11, color: S.text3, textTransform: "uppercase", letterSpacing: "0.1em", paddingBottom: 6, borderBottom: `1px solid ${S.border}` }}>Prix</div>
+        <div style={{ fontSize: 11, color: S.text3, textTransform: "uppercase", letterSpacing: "0.1em", paddingBottom: 6, borderBottom: `1px solid ${S.border}` }}>% admin</div>
+        {rows.map((row) => (
+          <div key={row.label} style={{ display: "contents" }}>
+            <div style={{ fontSize: 13, color: S.text2 }}>{row.label}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: S.text }}>{row.percentage}%</div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

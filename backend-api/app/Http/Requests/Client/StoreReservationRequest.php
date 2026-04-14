@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Client;
 
+use App\Enums\PaymentMethod;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreReservationRequest extends FormRequest
@@ -20,7 +21,7 @@ class StoreReservationRequest extends FormRequest
             'pickup_time' => ['required', 'date_format:H:i'],
             'return_date' => ['required', 'date', 'after:pickup_date'],
             'return_time' => ['required', 'date_format:H:i'],
-            'payment_method' => ['required', 'string', 'in:card,mobile_money'],
+            'payment_method' => ['required', 'string', 'in:'.implode(',', PaymentMethod::values())],
             'client_name' => ['required', 'string', 'max:255'],
             'client_phone' => ['required', 'string', 'max:30'],
             'identity_number' => ['required', 'string', 'max:100'],

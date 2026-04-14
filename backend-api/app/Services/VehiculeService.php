@@ -12,7 +12,8 @@ class VehiculeService
 {
     public function __construct(
         private readonly VehicleRepository $vehicles,
-        private readonly ReservationRepository $reservations
+        private readonly ReservationRepository $reservations,
+        private readonly TarificationService $tarificationService
     ) {}
 
     public function cataloguePublic(Request $request)
@@ -22,8 +23,11 @@ class VehiculeService
 
     public function creerPourAgence(array $data, int $agencyId): Vehicle
     {
+        $pricing = $this->tarificationService->calculate((float) $data['price'], (string) $data['listing_type']);
+
         return $this->vehicles->create([
             ...$data,
+            'service_fee' => $pricing['amount'],
             'agency_id' => $agencyId,
             'reference' => GenererReference::vehicule(),
             'slug' => GenererReference::slug($data['brand'].'-'.$data['model']),
@@ -32,7 +36,15 @@ class VehiculeService
 
     public function mettreAJourPourAgence(Vehicle $vehicle, array $data): Vehicle
     {
-        return $this->vehicles->update($vehicle, $data);
+        $pricing = $this->tarificationService->calculate(
+            (float) ($data['price'] ?? $vehicle->price),
+            (string) ($data['listing_type'] ?? ($vehicle->listing_type?->value ?? $vehicle->listing_type))
+        );
+
+        return $this->vehicles->update($vehicle, [
+            ...$data,
+            'service_fee' => $pricing['amount'],
+        ]);
     }
 
     public function verifierDisponibilite(int $vehicleId, string $pickupDate, string $returnDate): bool

@@ -294,7 +294,7 @@ export function LocDetail({ vehicle, user, onClose, onGoToSale, onOpenAgency, on
   const ag = agencyInfo[vehicle.agency]||{address:'Dakar',stars:'★★★★☆',since:'Depuis 2022'};
 
   if(showPayment) return (
-    <LocPayment vehicle={vehicle} lieu={lieu} depDate={depDate} retDate={retDate} days={days} total={total}
+    <LocPayment vehicle={vehicle} lieu={lieu} depDate={depDate} depHeure={depHeure} retDate={retDate} retHeure={retHeure} days={days} total={total}
       user={user}
       onBack={()=>setShowPayment(false)} onClose={onClose} onNotif={onNotif} onCreateReservation={onCreateReservation}/>
   );
@@ -432,7 +432,7 @@ export function LocDetail({ vehicle, user, onClose, onGoToSale, onOpenAgency, on
 }
 
 // ── Location Payment ──────────────────────────────────────────────────
-function LocPayment({ vehicle, lieu, depDate, retDate, days, total, user, onBack, onClose, onNotif, onCreateReservation }) {
+function LocPayment({ vehicle, lieu, depDate, depHeure, retDate, retHeure, days, total, user, onBack, onClose, onNotif, onCreateReservation }) {
   const { isMobile } = useResponsive();
   const [cgu, setCgu] = useState(false);
   const [cga, setCga] = useState(false);
@@ -461,9 +461,9 @@ function LocPayment({ vehicle, lieu, depDate, retDate, days, total, user, onBack
           vehicle_id: vehicle.backendId,
           pickup_location: lieu || vehicle.city || "Dakar",
           pickup_date: depDate,
-          pickup_time: "08:00",
+          pickup_time: depHeure || "08:00",
           return_date: retDate,
-          return_time: "18:00",
+          return_time: retHeure || "18:00",
           payment_method: payMethod === "mobile" ? "mobile_money" : "card",
           client_name: nom,
           client_phone: tel,
@@ -505,7 +505,7 @@ function LocPayment({ vehicle, lieu, depDate, retDate, days, total, user, onBack
         <div style={{fontSize:13,color:S.text2,lineHeight:1.8}}>
           <div>🚗 <strong>{vehicle.name}</strong> {vehicle.image && <img src={vehicleImages[vehicle.image]} alt="" style={{width:20,height:20,objectFit:'cover',marginLeft:5,borderRadius:4,verticalAlign:'middle'}}/>}</div>
           <div>📍 {lieu||'Lieu non précise'}</div>
-          <div>📅 Du {depDate} au {retDate} ({days} jour{days>1?'s':''})</div>
+          <div>📅 Du {depDate} a {depHeure || '08:00'} au {retDate} a {retHeure || '18:00'} ({days} jour{days>1?'s':''})</div>
           <div>🏢 {vehicle.agency}</div>
         </div>
         <div style={{borderTop:`1px dashed ${S.locMid}`,marginTop:12,paddingTop:12,display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12}}>

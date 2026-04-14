@@ -94,6 +94,8 @@ class AgencyRegistrationRequestController extends Controller
         }
 
         DB::transaction(function () use ($agencyRegistrationRequest): void {
+            [$contactFirstName, $contactLastName] = $this->splitManagerName($agencyRegistrationRequest->manager_name);
+
             $agency = $this->agencies->create([
                 'name' => $agencyRegistrationRequest->company,
                 'slug' => GenererReference::slug($agencyRegistrationRequest->company),
@@ -101,16 +103,32 @@ class AgencyRegistrationRequestController extends Controller
                 'city' => $agencyRegistrationRequest->city,
                 'district' => $agencyRegistrationRequest->district,
                 'address' => $agencyRegistrationRequest->address,
+                'contact_first_name' => $contactFirstName,
+                'contact_last_name' => $contactLastName,
                 'contact_phone' => $agencyRegistrationRequest->phone,
                 'contact_email' => $agencyRegistrationRequest->email,
                 'ninea' => $agencyRegistrationRequest->ninea,
                 'color' => $agencyRegistrationRequest->color ?: '#D40511',
                 'logo_url' => $agencyRegistrationRequest->logo_url,
-                'status' => 'active',
+                'status' => 'pending',
                 'documents' => $agencyRegistrationRequest->documents,
                 'metadata' => [
                     'source' => 'agency_registration_request',
                     'registration_request_id' => $agencyRegistrationRequest->id,
+                    'registration_request_snapshot' => [
+                        'company' => $agencyRegistrationRequest->company,
+                        'manager_name' => $agencyRegistrationRequest->manager_name,
+                        'email' => $agencyRegistrationRequest->email,
+                        'phone' => $agencyRegistrationRequest->phone,
+                        'city' => $agencyRegistrationRequest->city,
+                        'activity' => $agencyRegistrationRequest->activity,
+                        'district' => $agencyRegistrationRequest->district,
+                        'address' => $agencyRegistrationRequest->address,
+                        'ninea' => $agencyRegistrationRequest->ninea,
+                        'color' => $agencyRegistrationRequest->color,
+                        'logo_url' => $agencyRegistrationRequest->logo_url,
+                        'documents' => $agencyRegistrationRequest->documents,
+                    ],
                 ],
             ]);
 
@@ -136,5 +154,20 @@ class AgencyRegistrationRequestController extends Controller
             'Demande agence enregistree avec succes.',
             new AgencyRegistrationRequestResource($agencyRegistrationRequest->fresh())
         );
+    }
+
+    private function splitManagerName(?string $managerName): array
+    {
+        $trimmedName = trim((string) $managerName);
+
+        if ($trimmedName === '') {
+            return [null, null];
+        }
+
+        $parts = preg_split('/\s+/', $trimmedName) ?: [];
+        $firstName = array_shift($parts) ?: null;
+        $lastName = $parts !== [] ? implode(' ', $parts) : null;
+
+        return [$firstName, $lastName];
     }
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useResponsive } from "../hooks/useResponsive";
+import { getPricingBands } from "../utils/pricing";
 import logo from "../assets/logofinal.png";
 import landcruiserImg from "../assets/landcruiser.jpg";
 import bmwImg from "../assets/bmw-x5-30d-2019-08_1.jpg";
@@ -73,6 +74,7 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
   const [fieldErrors, setFieldErrors] = useState({});
   const [clientMode, setClientMode] = useState("login");
   const [agencyMode, setAgencyMode] = useState("login");
+  const [showConditions, setShowConditions] = useState(false);
   const { isMobile } = useResponsive();
 
   const formPanelStyle = {
@@ -210,6 +212,7 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
 
   return (
     <div style={pageStyle}>
+      {showConditions ? <TarificationModal onClose={() => setShowConditions(false)} /> : null}
       <div style={{ ...styles.glow, top: -120, left: -80, background: `radial-gradient(circle, ${config.accent}33, transparent 70%)` }} />
       <div style={{ ...styles.glow, top: 90, right: -120, background: "radial-gradient(circle, rgba(255,255,255,0.12), transparent 70%)" }} />
 
@@ -263,6 +266,9 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
                 <div style={styles.signupBannerText}>
                   Remplissez ce formulaire pour creer votre profil agence et acceder ensuite a votre espace partenaire.
                 </div>
+                <button type="button" onClick={() => setShowConditions(true)} style={styles.conditionsButton}>
+                  Voir les conditions et tarifications
+                </button>
               </div>
             )}
 
@@ -431,11 +437,11 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
                   </>
                 ) : (
                   <Field
-                    label={role === "admin" ? "Email administrateur" : role === "agency" ? "Identifiant agence" : "Email"}
+                    label={role === "admin" ? "Email administrateur" : role === "agency" ? "Email ou telephone agence" : "Email"}
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    placeholder={role === "agency" ? "ID agence fourni par Car Express" : "vous@carexpress.sn"}
+                    placeholder={role === "agency" ? "contact@agence.sn ou +221 77 000 00 00" : "vous@carexpress.sn"}
                     type={role === "agency" ? "text" : "email"}
                     error={fieldErrors.email}
                   />
@@ -540,6 +546,62 @@ function FileField({ label, error, hint, files, onChange }) {
       </div>
       {error ? <span style={styles.fieldError}>{error}</span> : hint ? <span style={styles.fieldHint}>{hint}</span> : null}
     </label>
+  );
+}
+
+function TarificationModal({ onClose }) {
+  const sections = [
+    {
+      key: "rental",
+      title: "Location",
+      subtitle: "Commission admin appliquee sur le prix journalier de chaque annonce location.",
+      rows: getPricingBands("rental"),
+    },
+    {
+      key: "sale",
+      title: "Achat",
+      subtitle: "Commission admin appliquee sur le prix total de vente de chaque annonce achat.",
+      rows: getPricingBands("sale"),
+    },
+  ];
+
+  return (
+    <div style={styles.modalBackdrop}>
+      <div style={styles.modalCard}>
+        <div style={styles.modalHeader}>
+          <div>
+            <div style={styles.signupBannerTitle}>Conditions et tarifications agence</div>
+            <div style={styles.signupBannerText}>
+              Car Express applique une commission admin calculee automatiquement selon la grille ci-dessous pour les annonces location et achat.
+            </div>
+          </div>
+          <button type="button" onClick={onClose} style={styles.secondaryButton}>Fermer</button>
+        </div>
+
+        <div style={{ display: "grid", gap: 18 }}>
+          {sections.map((section) => (
+            <div key={section.key} style={styles.tariffPanel}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{section.title}</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.74)", lineHeight: 1.7 }}>{section.subtitle}</div>
+              <div style={styles.tariffTable}>
+                <div style={styles.tariffHead}>Prix</div>
+                <div style={styles.tariffHead}>%</div>
+                {section.rows.map((row) => (
+                  <div key={row.label} style={styles.tariffCell}>
+                    <span>{row.label}</span>
+                    <strong>{row.percentage}%</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <div style={styles.tariffNotice}>
+            Lors de la creation d'une annonce, le pourcentage admin et le montant correspondant sont affiches automatiquement a partir du prix saisi.
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -823,6 +885,18 @@ const styles = {
     lineHeight: 1.65,
     color: "rgba(255,255,255,0.92)",
   },
+  conditionsButton: {
+    border: "1px solid rgba(255,255,255,0.2)",
+    borderRadius: 999,
+    background: "rgba(255,255,255,0.08)",
+    color: "#fff",
+    padding: "10px 14px",
+    fontWeight: 700,
+    fontSize: 12,
+    cursor: "pointer",
+    width: "fit-content",
+    marginTop: 6,
+  },
   formAccent: {
     width: 16,
     height: 46,
@@ -1021,6 +1095,66 @@ const styles = {
     fontSize: 14,
     cursor: "pointer",
     boxShadow: "0 12px 24px rgba(17,17,17,0.06)",
+  },
+  modalBackdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 4000,
+    background: "rgba(0,0,0,0.64)",
+    backdropFilter: "blur(8px)",
+    padding: 18,
+    overflowY: "auto",
+  },
+  modalCard: {
+    maxWidth: 920,
+    margin: "0 auto",
+    borderRadius: 28,
+    background: "linear-gradient(180deg, rgba(15,15,15,0.98), rgba(29,24,19,0.98))",
+    border: "1px solid rgba(255,255,255,0.08)",
+    boxShadow: "0 30px 90px rgba(0,0,0,0.36)",
+    padding: 24,
+  },
+  modalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 16,
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    marginBottom: 18,
+  },
+  tariffPanel: {
+    display: "grid",
+    gap: 10,
+    padding: 18,
+    borderRadius: 20,
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.08)",
+  },
+  tariffTable: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0,1fr) auto",
+    gap: 10,
+    alignItems: "center",
+  },
+  tariffHead: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.14em",
+    color: "rgba(255,255,255,0.52)",
+    paddingBottom: 8,
+    borderBottom: "1px solid rgba(255,255,255,0.08)",
+  },
+  tariffCell: {
+    display: "contents",
+  },
+  tariffNotice: {
+    padding: "14px 16px",
+    borderRadius: 18,
+    background: "rgba(255,204,0,0.12)",
+    border: "1px solid rgba(255,204,0,0.18)",
+    color: "#f7e7a8",
+    fontSize: 13,
+    lineHeight: 1.7,
   },
   formFooter: {
     marginTop: 18,

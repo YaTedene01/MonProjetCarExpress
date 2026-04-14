@@ -68,6 +68,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
   const [apiAgencies, setApiAgencies] = useState(agencies);
   const [apiUsers, setApiUsers] = useState(users);
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
+  const [dashboardAlerts, setDashboardAlerts] = useState(adminAlerts);
   const [agencyRequests, setAgencyRequests] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
@@ -81,6 +82,14 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
       if (agencyRows.length) setApiAgencies(agencyRows.map((agency) => adaptAdminAgency(agency)));
       if (userRows.length) setApiUsers(userRows.map((user) => adaptAdminUser(user)));
       if (dashboard?.metrics) setDashboardMetrics(dashboard.metrics);
+      if (dashboard?.alerts?.length) {
+        setDashboardAlerts(dashboard.alerts.map((alert) => ({
+          type: getAdminAlertType(alert),
+          title: alert.title,
+          detail: alert.message,
+          tone: getAdminAlertTone(alert),
+        })));
+      }
       setAgencyRequests(requests);
     });
   }, []);
@@ -111,7 +120,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
         }}
       />
       <section className="container-responsive" style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 20px 0" }}>
-        {page === "home" && <AdminHome onRegisterAgency={onRegisterAgency} agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} />}
+        {page === "home" && <AdminHome onRegisterAgency={onRegisterAgency} agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} />}
         {page === "users" && <AdminUsers adminSearch={adminSearch} setAdminSearch={setAdminSearch} users={apiUsers} agencies={apiAgencies} />}
         {page === "agences" && <AdminAgences onViewAgency={setSelectedAgency} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} />}
         {page === "messages" && <AdminMessages requests={agencyRequests} selectedRequest={selectedRequest} onSelectRequest={async (request) => {
@@ -131,7 +140,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
   );
 }
 
-function AdminHome({ onRegisterAgency, agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, onAgencyCreated, agencyRequests }) {
+function AdminHome({ onRegisterAgency, agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onAgencyCreated, agencyRequests }) {
   const [adminTab, setAdminTab] = useState("dashboard");
   const pendingAgencyRequests = agencyRequests;
 
@@ -180,14 +189,14 @@ function AdminHome({ onRegisterAgency, agencyBranding, adminSearch, setAdminSear
         </div>
       </Panel>
 
-      {adminTab === "dashboard" && <AdminDashboard adminSearch={adminSearch} agencies={agencies} users={users} dashboardMetrics={dashboardMetrics} />}
+      {adminTab === "dashboard" && <AdminDashboard adminSearch={adminSearch} agencies={agencies} users={users} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} />}
       {adminTab === "register" && <RegisterAgency onRegisterAgency={onRegisterAgency} onAgencyCreated={onAgencyCreated} />}
       {adminTab === "manage" && <ManageAgencies />}
     </div>
   );
 }
 
-function AdminDashboard({ adminSearch, agencies, users, dashboardMetrics }) {
+function AdminDashboard({ adminSearch, agencies, users, dashboardMetrics, dashboardAlerts }) {
   const quickResults = useMemo(() => {
     const q = adminSearch.trim().toLowerCase();
     if (!q) return [];
@@ -236,7 +245,7 @@ function AdminDashboard({ adminSearch, agencies, users, dashboardMetrics }) {
 
         <Panel title="Centre d'alertes" subtitle="Signalements clients, actions a venir et echeances">
           <div style={{ display: "grid", gap: 10 }}>
-            {adminAlerts.map((alert) => (
+            {dashboardAlerts.map((alert) => (
               <AdminAlertCard key={alert.title} alert={alert} />
             ))}
           </div>
@@ -283,6 +292,20 @@ function AdminDashboard({ adminSearch, agencies, users, dashboardMetrics }) {
   );
 }
 
+function getAdminAlertTone(alert) {
+  const type = alert?.context?.type;
+  if (type === "purchase_service_fee_paid") return "blue";
+  if (type === "purchase_request_created") return "amber";
+  return "red";
+}
+
+function getAdminAlertType(alert) {
+  const type = alert?.context?.type;
+  if (type === "purchase_service_fee_paid") return "Frais de service";
+  if (type === "purchase_request_created") return "Demande d'achat";
+  return "Notification";
+}
+
 function RegisterAgency({ onRegisterAgency, onAgencyCreated }) {
   const [submitted, setSubmitted] = useState(false);
   const [activity, setActivity] = useState("Location");
@@ -314,11 +337,11 @@ function RegisterAgency({ onRegisterAgency, onAgencyCreated }) {
 
   if (submitted) {
     return (
-      <Panel title="Agence enregistree" subtitle="Les identifiants d'acces ont ete envoyes par SMS.">
+      <Panel title="Agence enregistree" subtitle="Le compte partenaire est cree et en attente de premiere connexion.">
         <div style={{ display: "grid", gap: 14, justifyItems: "start" }}>
           <div style={{ width: 66, height: 66, borderRadius: 20, background: S.successSoft, color: S.success, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>✓</div>
           <div style={{ color: S.text2, fontSize: 14, lineHeight: 1.7 }}>
-            L'agence a ete creee avec succes. Le responsable recevra ses informations de connexion et pourra acceder a l'espace partenaire.
+            L'agence a ete creee avec succes. Le responsable peut se connecter des maintenant avec son email professionnel et le mot de passe provisoire <strong>agency12345</strong>. Son statut passera a actif des sa premiere connexion.
           </div>
           <Btn onClick={() => setSubmitted(false)} style={{ width: "auto", paddingInline: 22 }}>Enregistrer une autre agence</Btn>
         </div>
@@ -373,7 +396,7 @@ function RegisterAgency({ onRegisterAgency, onAgencyCreated }) {
           </div>
           <div style={formGrid()}>
             <FormField label="Telephone *"><Input type="tel" placeholder="+221 77 000 00 00" {...f("tel")} /></FormField>
-            <FormField label="Email"><Input type="email" placeholder="contact@agence.sn" {...f("email")} /></FormField>
+            <FormField label="Email *"><Input type="email" placeholder="contact@agence.sn" {...f("email")} /></FormField>
           </div>
         </SectionCard>
 
@@ -591,7 +614,23 @@ function AdminAgences({ onViewAgency, adminSearch, setAdminSearch, agencies }) {
                   <td style={tableCellStyle()}><Chip tone={agency.type === "Les deux" ? "dark" : "gold"}>{agency.type}</Chip></td>
                   <td style={tableCellStyle()}><StatusPill value={agency.status} /></td>
                   <td style={tableCellStyle()}>{agency.revenue}</td>
-                  <td style={tableCellStyle()}><button type="button" onClick={() => onViewAgency(agency)} style={ghostButtonStyle()}>Voir</button></td>
+                  <td style={tableCellStyle()}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (agency.status === "Active") onViewAgency(agency);
+                      }}
+                      disabled={agency.status !== "Active"}
+                      title={agency.status === "Active" ? "Voir l'agence" : "Disponible apres la premiere connexion de l'agence"}
+                      style={{
+                        ...ghostButtonStyle(),
+                        opacity: agency.status === "Active" ? 1 : 0.45,
+                        cursor: agency.status === "Active" ? "pointer" : "not-allowed",
+                      }}
+                    >
+                      Voir
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

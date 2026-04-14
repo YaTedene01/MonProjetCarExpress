@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\AlertResource;
 use App\Models\Agency;
+use App\Models\Alert;
 use App\Models\PurchaseRequest;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
 class DashboardController extends Controller
@@ -35,7 +38,7 @@ class DashboardController extends Controller
             new OA\Response(response: 500, description: 'Erreur serveur', content: new OA\JsonContent(ref: '#/components/schemas/ServerErrorResponse'))
         ]
     )]
-    public function __invoke(): JsonResponse
+    public function __invoke(Request $request): JsonResponse
     {
         return $this->successResponse('Tableau de bord administration recupere avec succes.', [
             'metrics' => [
@@ -46,6 +49,13 @@ class DashboardController extends Controller
                 'reservations_count' => Reservation::count(),
                 'purchase_requests_count' => PurchaseRequest::count(),
             ],
+            'alerts' => AlertResource::collection(
+                Alert::query()
+                    ->where('user_id', $request->user()->id)
+                    ->latest()
+                    ->limit(10)
+                    ->get()
+            ),
         ]);
     }
 }
