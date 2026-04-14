@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Topbar, BottomNav, ProfileMenuItem, Input, FormField, Select, Btn } from "../components/UI";
 import { AgencyProfilePage } from "../components/VehicleDetail";
 import { adaptAdminAgency, adaptAdminUser } from "../services/adapters";
-import { createAdminAgency, fetchAdminAgencies, fetchAdminDashboard, fetchAdminUsers } from "../services/catalogue";
+import { fetchAdminAgencies, fetchAdminDashboard, fetchAdminUsers } from "../services/catalogue";
 import { approveAgencyRequest, downloadAgencyRequestDocument, getAgencyRequest, getAgencyRequests, openAgencyRequestDocument } from "../services/agencyRequests";
 
 const S = {
@@ -123,7 +123,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
         }}
       />
       <section className="container-responsive" style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 20px 0" }}>
-        {page === "home" && <AdminHome onRegisterAgency={onRegisterAgency} agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} />}
+        {page === "home" && <AdminHome agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} />}
         {page === "users" && <AdminUsers adminSearch={adminSearch} setAdminSearch={setAdminSearch} users={apiUsers} agencies={apiAgencies} />}
         {page === "agences" && <AdminAgences onViewAgency={setSelectedAgency} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} />}
         {page === "messages" && <AdminMessages requests={agencyRequests} selectedRequest={selectedRequest} approveError={approveError} approveSuccess={approveSuccess} approvingRequestId={approvingRequestId} onSelectRequest={async (request) => {
@@ -156,7 +156,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
   );
 }
 
-function AdminHome({ onRegisterAgency, agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onAgencyCreated, agencyRequests }) {
+function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onAgencyCreated, agencyRequests }) {
   const [adminTab, setAdminTab] = useState("dashboard");
   const pendingAgencyRequests = agencyRequests;
 
@@ -206,7 +206,7 @@ function AdminHome({ onRegisterAgency, agencyBranding, adminSearch, setAdminSear
       </Panel>
 
       {adminTab === "dashboard" && <AdminDashboard adminSearch={adminSearch} agencies={agencies} users={users} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} />}
-      {adminTab === "register" && <RegisterAgency onRegisterAgency={onRegisterAgency} onAgencyCreated={onAgencyCreated} />}
+      {adminTab === "register" && <RegisterAgency onAgencyCreated={onAgencyCreated} pendingRequests={agencyRequests} />}
       {adminTab === "manage" && <ManageAgencies />}
     </div>
   );
@@ -322,157 +322,39 @@ function getAdminAlertType(alert) {
   return "Notification";
 }
 
-function RegisterAgency({ onRegisterAgency, onAgencyCreated }) {
-  const [submitted, setSubmitted] = useState(false);
-  const [activity, setActivity] = useState("Location");
-  const [documents, setDocuments] = useState([]);
-  const [form, setForm] = useState({
-    nom: "",
-    ville: "Dakar",
-    quartier: "",
-    adresse: "",
-    prenom: "",
-    nomResp: "",
-    tel: "",
-    email: "",
-    ninea: "",
-    color: "#D40511",
-    logoUrl: "",
-  });
-
-  const f = (key) => ({ value: form[key], onChange: (e) => setForm((prev) => ({ ...prev, [key]: e.target.value })) });
-  const handleLogo = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setForm((prev) => ({ ...prev, logoUrl: URL.createObjectURL(file) }));
-  };
-  const handleDocuments = (e) => {
-    const files = Array.from(e.target.files || []);
-    setDocuments(files);
-  };
-
-  if (submitted) {
-    return (
-      <Panel title="Agence enregistree" subtitle="Le compte partenaire est cree et en attente de premiere connexion.">
-        <div style={{ display: "grid", gap: 14, justifyItems: "start" }}>
-          <div style={{ width: 66, height: 66, borderRadius: 20, background: S.successSoft, color: S.success, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>✓</div>
-          <div style={{ color: S.text2, fontSize: 14, lineHeight: 1.7 }}>
-            L'agence a ete creee avec succes. Le responsable peut se connecter des maintenant avec son email professionnel et le mot de passe provisoire <strong>agency12345</strong>. Son statut passera a actif des sa premiere connexion.
-          </div>
-          <Btn onClick={() => setSubmitted(false)} style={{ width: "auto", paddingInline: 22 }}>Enregistrer une autre agence</Btn>
-        </div>
-      </Panel>
-    );
-  }
-
+function RegisterAgency({ pendingRequests }) {
   return (
-    <Panel title="Enregistrer une agence" subtitle="Creation d'un nouvel espace partenaire avec ses donnees administratives">
+    <Panel title="Enregistrer une agence" subtitle="Le compte agence doit etre cree uniquement depuis une demande envoyee par l'agence.">
       <div style={{ display: "grid", gap: 14 }}>
-        <SectionCard title="Informations agence">
-          <FormField label="Nom de l'agence *"><Input placeholder="Ex : Dakar Auto Services" {...f("nom")} /></FormField>
-          <div style={formGrid()}>
-            <FormField label="Ville *">
-              <Select {...f("ville")}>
-                {["Dakar", "Thies", "Saint-Louis", "Kaolack", "Touba", "Ziguinchor"].map((city) => <option key={city}>{city}</option>)}
-              </Select>
-            </FormField>
-            <FormField label="Quartier"><Input placeholder="Ex : Plateau" {...f("quartier")} /></FormField>
+        <div style={{ padding: "16px 18px", borderRadius: 20, background: S.amberSoft, border: `1px solid rgba(255,204,0,0.34)`, color: S.text, lineHeight: 1.7 }}>
+          L'agence doit d'abord envoyer sa demande depuis l'espace partenaire avec son email, telephone, mot de passe, logo et documents justificatifs. Ensuite seulement, l'administrateur peut l'enregistrer depuis l'onglet <strong>Messages</strong>.
+        </div>
+
+        <SectionCard title="Workflow obligatoire">
+          <div style={{ display: "grid", gap: 10, color: S.text2, fontSize: 14, lineHeight: 1.7 }}>
+            <div>1. L'agence remplit le formulaire de demande d'enregistrement.</div>
+            <div>2. La demande arrive dans les messages d'enregistrement agence.</div>
+            <div>3. L'admin ouvre la demande et clique sur <strong>Enregistrer l'agence</strong>.</div>
+            <div>4. Le compte agence recupere les vraies donnees de connexion envoyees par le partenaire.</div>
           </div>
-          <FormField label="Adresse complete"><Input placeholder="Rue, numero, point de repere" {...f("adresse")} /></FormField>
         </SectionCard>
 
-        <SectionCard title="Identite visuelle agence">
-          <div style={formGrid()}>
-            <FormField label="Couleur agence">
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <input type="color" value={form.color} onChange={(e) => setForm((prev) => ({ ...prev, color: e.target.value }))} style={{ width: 54, height: 46, border: `1px solid ${S.border}`, borderRadius: 12, background: "#fff", padding: 4 }} />
-                <Input placeholder="#D40511" value={form.color} onChange={(e) => setForm((prev) => ({ ...prev, color: e.target.value }))} />
-              </div>
-            </FormField>
-            <FormField label="Logo agence">
-              <div style={{ display: "grid", gap: 10 }}>
-                <label style={{ border: `1px dashed ${S.borderStrong}`, borderRadius: 16, background: "rgba(255,255,255,0.72)", padding: "14px 16px", cursor: "pointer" }}>
-                  <input type="file" accept="image/*" onChange={handleLogo} style={{ display: "none" }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: S.text }}>Ajouter le logo de l'agence</span>
-                </label>
-                {form.logoUrl && (
-                  <div style={{ width: 72, height: 72, borderRadius: 18, overflow: "hidden", border: `1px solid ${S.border}` }}>
-                    <img src={form.logoUrl} alt="Logo agence" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <SectionCard title="Demandes en attente">
+          {pendingRequests?.length ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              {pendingRequests.map((request) => (
+                <div key={request.id} style={{ padding: "12px 14px", borderRadius: 16, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.76)" }}>
+                  <div style={{ fontWeight: 700, color: S.text }}>{request.company}</div>
+                  <div style={{ marginTop: 4, fontSize: 13, color: S.text3 }}>
+                    {request.city} · {request.email || "email non renseigne"} · {request.status === "pending" ? "En attente" : "Deja enregistree"}
                   </div>
-                )}
-              </div>
-            </FormField>
-          </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyText>Aucune demande agence en attente. L'agence doit d'abord envoyer sa demande depuis son espace.</EmptyText>
+          )}
         </SectionCard>
-
-        <SectionCard title="Responsable et contact">
-          <div style={formGrid()}>
-            <FormField label="Prenom *"><Input placeholder="Prenom" {...f("prenom")} /></FormField>
-            <FormField label="Nom *"><Input placeholder="Nom" {...f("nomResp")} /></FormField>
-          </div>
-          <div style={formGrid()}>
-            <FormField label="Telephone *"><Input type="tel" placeholder="+221 77 000 00 00" {...f("tel")} /></FormField>
-            <FormField label="Email *"><Input type="email" placeholder="contact@agence.sn" {...f("email")} /></FormField>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Type d'activite">
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {["Location", "Vente", "Location & Vente"].map((item) => (
-              <FilterChip key={item} active={activity === item} onClick={() => setActivity(item)}>{item}</FilterChip>
-            ))}
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Documents et references">
-          <FormField label="NINEA / Registre de commerce"><Input placeholder="SN-2026-00123" {...f("ninea")} /></FormField>
-          <label style={{ display: "grid", gap: 10, border: `1px dashed ${S.borderStrong}`, borderRadius: 20, background: "rgba(255,255,255,0.62)", padding: 24, textAlign: "center", cursor: "pointer" }}>
-            <input type="file" accept=".pdf,image/*" multiple onChange={handleDocuments} style={{ display: "none" }} />
-            <div style={{ fontSize: 28, marginBottom: 10 }}>📄</div>
-            <div style={{ fontWeight: 600, color: S.text }}>Joindre les documents justificatifs</div>
-            <div style={{ color: S.text3, fontSize: 13, marginTop: 5 }}>PDF ou image, 5 Mo maximum</div>
-            {!!documents.length && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 8 }}>
-                {documents.map((document) => (
-                  <span key={`${document.name}-${document.size}`} style={{ padding: "7px 10px", borderRadius: 999, background: "rgba(17,17,17,0.06)", color: S.text, fontSize: 12 }}>
-                    {document.name}
-                  </span>
-                ))}
-              </div>
-            )}
-          </label>
-        </SectionCard>
-
-        <Btn onClick={async () => {
-          const created = await createAdminAgency({
-            name: form.nom || "Nouvelle agence",
-            activity,
-            city: form.ville || "Dakar",
-            district: form.quartier || "",
-            address: form.adresse || "",
-            contact_first_name: form.prenom || "",
-            contact_last_name: form.nomResp || "",
-            contact_phone: form.tel || "",
-            contact_email: form.email || "",
-            ninea: form.ninea || "",
-            color: form.color || "#D40511",
-            logo_url: form.logoUrl || "",
-            manager_name: `${form.prenom || ""} ${form.nomResp || ""}`.trim(),
-            manager_email: form.email || "",
-            manager_phone: form.tel || "",
-            manager_password: "agency12345",
-          });
-
-          onRegisterAgency?.({
-            name: form.nom || "Nouvelle agence",
-            activity,
-            city: `${form.ville}${form.quartier ? ` · ${form.quartier}` : ""}`,
-            color: form.color || "#D40511",
-            logoUrl: form.logoUrl || "",
-          });
-          onAgencyCreated?.(created);
-          setSubmitted(true);
-        }}>Enregistrer l'agence</Btn>
       </div>
     </Panel>
   );
