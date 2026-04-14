@@ -1,9 +1,78 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 const API_PREFIX = "/api/v1";
 const SESSION_STORAGE_KEY = "carexpress_session";
+let workingApiBaseUrl = null;
+
+function normalizeBaseUrl(url) {
+  return (url || "").trim().replace(/\/$/, "");
+}
+
+function isLocalHostName(hostname) {
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+function isLikelyNetworkError(error) {
+  return error instanceof TypeError;
+}
+
+function buildApiCandidates() {
+  const candidates = [];
+  const configured = normalizeBaseUrl(API_BASE_URL);
+
+  if (workingApiBaseUrl !== null) {
+    candidates.push(workingApiBaseUrl);
+  }
+
+  if (configured !== "") {
+    try {
+      const configuredUrl = new URL(configured);
+      const browser = typeof window !== "undefined" ? window.location : null;
+      const browserIsHttps = browser?.protocol === "https:";
+      const configuredIsHttp = configuredUrl.protocol === "http:";
+      const configuredIsLocal = isLocalHostName(configuredUrl.hostname);
+
+      // In production HTTPS contexts, avoid forcing an insecure/non-local API origin.
+      if (!(browserIsHttps && configuredIsHttp && !configuredIsLocal)) {
+        candidates.push(configured);
+      }
+    } catch {
+      candidates.push(configured);
+    }
+  }
+
+  const browser = typeof window !== "undefined" ? window.location : null;
+  if (browser && browser.origin) {
+    candidates.push(browser.origin);
+  }
+
+  // Local development fallbacks when env vars are missing or incorrect.
+  candidates.push("http://127.0.0.1:8000", "http://localhost:8000", "");
+
+  return Array.from(new Set(candidates.map(normalizeBaseUrl)));
+}
+
+async function fetchWithApiFallback(path, options) {
+  const candidates = buildApiCandidates();
+  let lastNetworkError = null;
+
+  for (const baseUrl of candidates) {
+    try {
+      const response = await fetch(`${baseUrl}${API_PREFIX}${path}`, options);
+      workingApiBaseUrl = baseUrl;
+      return response;
+    } catch (error) {
+      if (!isLikelyNetworkError(error)) {
+        throw error;
+      }
+      lastNetworkError = error;
+    }
+  }
+
+  throw lastNetworkError || new Error("Connexion API impossible.");
+}
 
 export function getApiBaseUrl() {
-  return API_BASE_URL;
+  return workingApiBaseUrl ?? API_BASE_URL;
 }
 
 export function getSessionStorageKey() {
@@ -40,10 +109,19 @@ export async function apiRequest(path, options = {}) {
     headers.Authorization = `Bearer ${session.token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, {
-    ...options,
-    headers,
-  });
+  let response;
+  try {
+    response = await fetchWithApiFallback(path, {
+      ...options,
+      headers,
+    });
+  } catch {
+    const error = new Error("Impossible de contacter le serveur. Verifiez que l API backend est demarree et que l URL API est correcte.");
+    error.status = 0;
+    error.payload = null;
+    error.fieldErrors = {};
+    throw error;
+  }
 
   let payload = null;
   try {
@@ -74,10 +152,15 @@ export async function apiDownload(path) {
     headers.Authorization = `Bearer ${session.token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, {
-    method: "GET",
-    headers,
-  });
+  let response;
+  try {
+    response = await fetchWithApiFallback(path, {
+      method: "GET",
+      headers,
+    });
+  } catch {
+    throw new Error("Impossible de contacter le serveur pour telecharger le fichier.");
+  }
 
   if (!response.ok) {
     throw new Error("Impossible de recuperer le fichier.");
