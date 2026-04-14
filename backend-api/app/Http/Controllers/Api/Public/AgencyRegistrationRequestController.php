@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\Public;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Public\StoreAgencyRegistrationRequest;
-use App\Http\Resources\AgencyRegistrationRequestResource;
 use App\Models\AgencyRegistrationRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
@@ -63,7 +62,18 @@ class AgencyRegistrationRequestController extends Controller
 
         return $this->successResponse(
             'Demande d enregistrement agence envoyee avec succes.',
-            new AgencyRegistrationRequestResource($registrationRequest),
+            [
+                'id' => $registrationRequest->id,
+                'company' => $registrationRequest->company,
+                'email' => $registrationRequest->email,
+                'phone' => $registrationRequest->phone,
+                'city' => $registrationRequest->city,
+                'activity' => $registrationRequest->activity,
+                'status' => $registrationRequest->status,
+                'logo_url' => $registrationRequest->logo_url,
+                'documents_count' => count($documents),
+                'created_at' => $registrationRequest->created_at,
+            ],
             201
         );
     }

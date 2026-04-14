@@ -597,7 +597,7 @@ function TarificationModal({ onClose }) {
           {sections.map((section) => (
             <div key={section.key} style={styles.tariffPanel}>
               <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{section.title}</div>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.74)", lineHeight: 1.7 }}>{section.subtitle}</div>
+              <div style={{ fontSize: 13, color: "#fff", lineHeight: 1.7 }}>{section.subtitle}</div>
               <div style={styles.tariffTable}>
                 <div style={styles.tariffHead}>Prix</div>
                 <div style={styles.tariffHead}>%</div>
@@ -1155,18 +1155,18 @@ const styles = {
     fontSize: 11,
     textTransform: "uppercase",
     letterSpacing: "0.14em",
-    color: "rgba(255,255,255,0.52)",
+    color: "#fff",
     paddingBottom: 8,
-    borderBottom: "1px solid rgba(255,255,255,0.08)",
+    borderBottom: "1px solid rgba(255,255,255,0.16)",
   },
   tariffPrice: {
-    color: "rgba(255,255,255,0.9)",
+    color: "#fff",
     fontSize: 15,
     lineHeight: 1.6,
     paddingTop: 6,
   },
   tariffRate: {
-    color: "#ffcc00",
+    color: "#fff",
     fontSize: 15,
     fontWeight: 800,
     textAlign: "right",
@@ -1177,7 +1177,7 @@ const styles = {
     borderRadius: 18,
     background: "rgba(255,204,0,0.12)",
     border: "1px solid rgba(255,204,0,0.18)",
-    color: "#f7e7a8",
+    color: "#fff",
     fontSize: 13,
     lineHeight: 1.7,
   },
