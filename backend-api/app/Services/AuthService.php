@@ -137,11 +137,11 @@ class AuthService
 
     private function isPendingAgencyRegistration(string $identifier): bool
     {
-        if (! Schema::hasTable('agency_registration_requests')) {
-            return false;
-        }
-
         try {
+            if (! Schema::hasTable('agency_registration_requests')) {
+                return false;
+            }
+
             return AgencyRegistrationRequest::query()
                 ->where('status', 'pending')
                 ->where(function ($query) use ($identifier): void {
@@ -149,7 +149,7 @@ class AuthService
                         ->orWhere('phone', $identifier);
                 })
                 ->exists();
-        } catch (QueryException) {
+        } catch (Throwable) {
             return false;
         }
     }
