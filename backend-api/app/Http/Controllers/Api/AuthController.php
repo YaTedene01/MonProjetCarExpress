@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
+use Throwable;
 
 class AuthController extends Controller
 {
@@ -267,9 +268,17 @@ class AuthController extends Controller
     )]
     public function authenticatedUser(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        try {
+            $user = $user->load('agency');
+        } catch (Throwable) {
+            // Keep response available even if agency relationship data is inconsistent.
+        }
+
         return $this->successResponse(
             'Utilisateur recupere avec succes.',
-            new UserResource($request->user()->load('agency'))
+            new UserResource($user)
         );
     }
 

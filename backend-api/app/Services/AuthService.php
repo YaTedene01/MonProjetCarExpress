@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class AuthService
 {
@@ -91,7 +92,7 @@ class AuthService
         }
 
         if ($data['role'] === UserRole::Agency->value) {
-            $agencyStatus = $user->agency?->status?->value ?? $user->agency?->status;
+            $agencyStatus = $this->resolveAgencyStatusRaw($user->agency_id);
 
             if ($agencyStatus === AgencyStatus::Suspended->value) {
                 throw ValidationException::withMessages([
@@ -99,18 +100,26 @@ class AuthService
                 ]);
             }
 
-            if ($user->agency !== null && $agencyStatus === AgencyStatus::Pending->value) {
-                $user->agency->update([
-                    'status' => AgencyStatus::Active->value,
+            if ($user->agency_id !== null && $agencyStatus === AgencyStatus::Pending->value) {
+                DB::table('agencies')
+                    ->where('id', $user->agency_id)
+                    ->update([
+                        'status' => AgencyStatus::Active->value,
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            if ($user->agency_id !== null && $agencyStatus !== null && ! in_array($agencyStatus, AgencyStatus::values(), true)) {
+                throw ValidationException::withMessages([
+                    'identifier' => ['Le statut de votre agence est invalide. Contactez l administration.'],
                 ]);
-                $user->unsetRelation('agency');
             }
         }
 
         $user->forceFill(['last_login_at' => now()])->save();
 
         return [
-            'utilisateur' => $user->load('agency'),
+            'utilisateur' => $this->safeLoadAgency($user),
             'token' => $user->createToken($data['device_name'] ?? 'web-app')->plainTextToken,
         ];
     }
@@ -142,6 +151,32 @@ class AuthService
                 ->exists();
         } catch (QueryException) {
             return false;
+        }
+    }
+
+    private function resolveAgencyStatusRaw(?int $agencyId): ?string
+    {
+        if ($agencyId === null || ! Schema::hasTable('agencies')) {
+            return null;
+        }
+
+        try {
+            $status = DB::table('agencies')
+                ->where('id', $agencyId)
+                ->value('status');
+
+            return is_string($status) ? $status : null;
+        } catch (QueryException) {
+            return null;
+        }
+    }
+
+    private function safeLoadAgency($user)
+    {
+        try {
+            return $user->load('agency');
+        } catch (Throwable) {
+            return $user;
         }
     }
 }
