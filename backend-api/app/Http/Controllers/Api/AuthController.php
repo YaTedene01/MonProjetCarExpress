@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\AgencyRegisterRequest;
 use App\Http\Requests\Auth\ClientRegisterRequest;
 use App\Http\Requests\Auth\LoginRequest;
-use App\Http\Resources\AgencyResource;
 use App\Http\Resources\UserResource;
 use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
@@ -140,17 +139,15 @@ class AuthController extends Controller
     )]
     public function registerAgency(AgencyRegisterRequest $request): JsonResponse
     {
-        $resultat = $this->authService->inscrireAgence([
-            ...$request->validated(),
-            'device_name' => $request->input('device_name', 'agency-web'),
-        ]);
-
-        return $this->successResponse('Compte agence créé avec succès.', [
-            'token' => $resultat['token'],
-            'token_type' => 'Bearer',
-            'utilisateur' => new UserResource($resultat['utilisateur']),
-            'agence' => new AgencyResource($resultat['agence']),
-        ], 201);
+        return $this->errorResponse(
+            'L inscription directe agence est desactivee. Veuillez envoyer une demande depuis le formulaire partenaire.',
+            422,
+            [
+                'workflow' => [
+                    'Envoyez une demande agence avec logo et documents, puis attendez la validation administrateur.',
+                ],
+            ]
+        );
     }
 
     #[OA\Post(

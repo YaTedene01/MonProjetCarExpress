@@ -99,6 +99,32 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
 
   const unreadAgencyRequests = useMemo(() => agencyRequests.filter((request) => !request.is_read).length, [agencyRequests]);
 
+  const handleApproveAgencyRequest = async (requestId) => {
+    setApproveError("");
+    setApproveSuccess("");
+    setApprovingRequestId(requestId);
+
+    try {
+      const approvedRequest = await approveAgencyRequest(requestId);
+      setSelectedRequest(approvedRequest);
+      setAgencyRequests((current) => current.map((item) => item.id === approvedRequest.id ? approvedRequest : item));
+      setApproveSuccess("L'agence a bien ete enregistree.");
+
+      const [agencyRows, userRows] = await Promise.all([
+        fetchAdminAgencies().catch(() => []),
+        fetchAdminUsers().catch(() => []),
+      ]);
+
+      if (agencyRows.length) setApiAgencies(agencyRows.map((agency) => adaptAdminAgency(agency)));
+      if (userRows.length) setApiUsers(userRows.map((user) => adaptAdminUser(user)));
+    } catch (error) {
+      setApproveError(error?.message || "Impossible d'enregistrer cette agence pour le moment.");
+      throw error;
+    } finally {
+      setApprovingRequestId(null);
+    }
+  };
+
   const navItems = [
     { key: "home", icon: "home", label: "Accueil" },
     { key: "users", icon: "users", label: "Utilisateurs" },
@@ -123,7 +149,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
         }}
       />
       <section className="container-responsive" style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 20px 0" }}>
-        {page === "home" && <AdminHome agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} />}
+        {page === "home" && <AdminHome agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} onApproveRequest={handleApproveAgencyRequest} approvingRequestId={approvingRequestId} />}
         {page === "users" && <AdminUsers adminSearch={adminSearch} setAdminSearch={setAdminSearch} users={apiUsers} agencies={apiAgencies} />}
         {page === "agences" && <AdminAgences onViewAgency={setSelectedAgency} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} />}
         {page === "messages" && <AdminMessages requests={agencyRequests} selectedRequest={selectedRequest} approveError={approveError} approveSuccess={approveSuccess} approvingRequestId={approvingRequestId} onSelectRequest={async (request) => {
@@ -133,20 +159,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
           setSelectedRequest(detailedRequest);
           setAgencyRequests((current) => current.map((item) => item.id === detailedRequest.id ? detailedRequest : item));
         }} onOpenDocument={openAgencyRequestDocument} onDownloadDocument={downloadAgencyRequestDocument} onApproveRequest={async (requestId) => {
-          setApproveError("");
-          setApproveSuccess("");
-          setApprovingRequestId(requestId);
-
-          try {
-            const approvedRequest = await approveAgencyRequest(requestId);
-            setSelectedRequest(approvedRequest);
-            setAgencyRequests((current) => current.map((item) => item.id === approvedRequest.id ? approvedRequest : item));
-            setApproveSuccess("L'agence a bien ete enregistree.");
-          } catch (error) {
-            setApproveError(error?.message || "Impossible d'enregistrer cette agence pour le moment.");
-          } finally {
-            setApprovingRequestId(null);
-          }
+          await handleApproveAgencyRequest(requestId);
         }} />}
         {page === "systeme" && <AdminSysteme />}
         {page === "profil" && <AdminProfil onLogout={onLogout} />}
@@ -156,9 +169,9 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
   );
 }
 
-function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onAgencyCreated, agencyRequests }) {
+function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onAgencyCreated, agencyRequests, onApproveRequest, approvingRequestId }) {
   const [adminTab, setAdminTab] = useState("dashboard");
-  const pendingAgencyRequests = agencyRequests;
+  const pendingAgencyRequests = agencyRequests.filter((request) => request.status === "pending");
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
@@ -206,7 +219,7 @@ function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, user
       </Panel>
 
       {adminTab === "dashboard" && <AdminDashboard adminSearch={adminSearch} agencies={agencies} users={users} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} />}
-      {adminTab === "register" && <RegisterAgency onAgencyCreated={onAgencyCreated} pendingRequests={agencyRequests} />}
+      {adminTab === "register" && <RegisterAgency onAgencyCreated={onAgencyCreated} pendingRequests={pendingAgencyRequests} onApproveRequest={onApproveRequest} approvingRequestId={approvingRequestId} />}
       {adminTab === "manage" && <ManageAgencies />}
     </div>
   );
@@ -322,7 +335,7 @@ function getAdminAlertType(alert) {
   return "Notification";
 }
 
-function RegisterAgency({ pendingRequests }) {
+function RegisterAgency({ pendingRequests, onApproveRequest, approvingRequestId }) {
   return (
     <Panel title="Enregistrer une agence" subtitle="Le compte agence doit etre cree uniquement depuis une demande envoyee par l'agence.">
       <div style={{ display: "grid", gap: 14 }}>
@@ -344,9 +357,36 @@ function RegisterAgency({ pendingRequests }) {
             <div style={{ display: "grid", gap: 10 }}>
               {pendingRequests.map((request) => (
                 <div key={request.id} style={{ padding: "12px 14px", borderRadius: 16, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.76)" }}>
-                  <div style={{ fontWeight: 700, color: S.text }}>{request.company}</div>
-                  <div style={{ marginTop: 4, fontSize: 13, color: S.text3 }}>
-                    {request.city} · {request.email || "email non renseigne"} · {request.status === "pending" ? "En attente" : "Deja enregistree"}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                    <div style={{ fontWeight: 700, color: S.text }}>{request.company}</div>
+                    <Chip tone="gold">En attente</Chip>
+                  </div>
+
+                  <div style={{ marginTop: 8, display: "grid", gap: 4, fontSize: 13, color: S.text3, lineHeight: 1.6 }}>
+                    <div><strong style={{ color: S.text2 }}>Ville:</strong> {request.city || "Non renseignee"}</div>
+                    <div><strong style={{ color: S.text2 }}>Email:</strong> {request.email || "Non renseigne"}</div>
+                    <div><strong style={{ color: S.text2 }}>Telephone:</strong> {request.phone || "Non renseigne"}</div>
+                    <div><strong style={{ color: S.text2 }}>Activite:</strong> {request.activity || "Non renseignee"}</div>
+                    <div><strong style={{ color: S.text2 }}>Responsable:</strong> {request.manager_name || "Non renseigne"}</div>
+                    <div><strong style={{ color: S.text2 }}>NINEA:</strong> {request.ninea || "Non renseigne"}</div>
+                    <div><strong style={{ color: S.text2 }}>Documents:</strong> {request.documents?.length || 0} piece(s)</div>
+                  </div>
+
+                  <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
+                    <button
+                      type="button"
+                      onClick={() => onApproveRequest?.(request.id)}
+                      disabled={approvingRequestId === request.id}
+                      style={{
+                        ...ghostButtonStyle(),
+                        borderColor: S.success,
+                        color: S.success,
+                        opacity: approvingRequestId === request.id ? 0.7 : 1,
+                        cursor: approvingRequestId === request.id ? "wait" : "pointer",
+                      }}
+                    >
+                      {approvingRequestId === request.id ? "Enregistrement..." : "Enregistrer l'agence"}
+                    </button>
                   </div>
                 </div>
               ))}
