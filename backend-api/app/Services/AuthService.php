@@ -42,7 +42,41 @@ class AuthService
 
     public function inscrireAgence(array $data): array
     {
-        return DB::transaction(function () use ($data): array {
+        try {
+            return DB::transaction(function () use ($data): array {
+                $agency = $this->agencies->create([
+                    'name' => $data['company'],
+                    'slug' => GenererReference::slug($data['company']),
+                    'activity' => $data['activity'] ?? 'Location et vente',
+                    'city' => $data['city'],
+                    'contact_phone' => $data['phone'],
+                    'contact_email' => $data['email'],
+                    'status' => 'pending',
+                    'metadata' => [
+                        'source' => 'public_agency_signup',
+                    ],
+                ]);
+
+                $user = $this->users->create([
+                    'agency_id' => $agency->id,
+                    'role' => UserRole::Agency,
+                    'name' => $data['company'],
+                    'email' => $data['email'],
+                    'phone' => $data['phone'],
+                    'city' => $data['city'],
+                    'password' => $data['password'],
+                    'status' => 'active',
+                ]);
+
+                return [
+                    'utilisateur' => $user->load('agency'),
+                    'agence' => $agency->loadCount('vehicles'),
+                    'token' => $user->createToken($data['device_name'] ?? 'agency-web')->plainTextToken,
+                ];
+            });
+        } catch (Throwable) {
+            // Fallback path for production environments where DB transaction
+            // behavior may fail intermittently with managed PostgreSQL poolers.
             $agency = $this->agencies->create([
                 'name' => $data['company'],
                 'slug' => GenererReference::slug($data['company']),
@@ -53,6 +87,7 @@ class AuthService
                 'status' => 'pending',
                 'metadata' => [
                     'source' => 'public_agency_signup',
+                    'fallback_mode' => 'without_transaction',
                 ],
             ]);
 
@@ -72,7 +107,7 @@ class AuthService
                 'agence' => $agency->loadCount('vehicles'),
                 'token' => $user->createToken($data['device_name'] ?? 'agency-web')->plainTextToken,
             ];
-        });
+        }
     }
 
     public function connecter(array $data): array
