@@ -195,10 +195,14 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
     setIsLoading(true);
 
     try {
-      await onSubmit({ ...formData, mode: role === "client" ? clientMode : role === "agency" ? agencyMode : "login" });
+      const submitResult = await onSubmit({ ...formData, mode: role === "client" ? clientMode : role === "agency" ? agencyMode : "login" });
 
       if (role === "agency" && agencyMode === "signup") {
-        setSuccessMessage("Votre demande agence a ete envoyee. Vous pourrez vous connecter uniquement apres validation par l'administrateur.");
+        if (submitResult?.mode === "direct_agency_signup_fallback") {
+          setSuccessMessage("Votre compte agence a ete cree. Vous pouvez maintenant vous connecter.");
+        } else {
+          setSuccessMessage("Votre demande agence a ete envoyee. Vous pourrez vous connecter uniquement apres validation par l'administrateur.");
+        }
         setAgencyMode("login");
         if (logoInputRef.current) {
           logoInputRef.current.value = "";
