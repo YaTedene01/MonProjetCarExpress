@@ -8,8 +8,10 @@ use App\Models\AgencyRegistrationRequest;
 use App\Repository\AgencyRepository;
 use App\Repository\UserRepository;
 use App\Utils\GenererReference;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class AuthService
@@ -126,12 +128,20 @@ class AuthService
 
     private function isPendingAgencyRegistration(string $identifier): bool
     {
-        return AgencyRegistrationRequest::query()
-            ->where('status', 'pending')
-            ->where(function ($query) use ($identifier): void {
-                $query->where('email', $identifier)
-                    ->orWhere('phone', $identifier);
-            })
-            ->exists();
+        if (! Schema::hasTable('agency_registration_requests')) {
+            return false;
+        }
+
+        try {
+            return AgencyRegistrationRequest::query()
+                ->where('status', 'pending')
+                ->where(function ($query) use ($identifier): void {
+                    $query->where('email', $identifier)
+                        ->orWhere('phone', $identifier);
+                })
+                ->exists();
+        } catch (QueryException) {
+            return false;
+        }
     }
 }
