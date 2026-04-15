@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Public\StoreAgencyRegistrationRequest;
 use App\Models\AgencyRegistrationRequest;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -13,7 +14,8 @@ class AgencyRegistrationRequestController extends Controller
 {
     public function store(StoreAgencyRegistrationRequest $request): JsonResponse
     {
-        $registrationRequest = AgencyRegistrationRequest::query()->create([
+        $table = 'agency_registration_requests';
+        $payload = [
             'company' => $request->string('company')->toString(),
             'email' => $request->string('email')->toString(),
             'phone' => $request->string('phone')->toString(),
@@ -23,12 +25,23 @@ class AgencyRegistrationRequestController extends Controller
             'district' => $request->string('district')->toString(),
             'address' => $request->string('address')->toString(),
             'ninea' => $request->string('ninea')->toString(),
-            'color' => $request->string('color')->toString(),
-            'password' => $request->string('password')->toString(),
             'status' => 'pending',
-            'logo_url' => '',
             'documents' => [],
-        ]);
+        ];
+
+        if (Schema::hasTable($table) && Schema::hasColumn($table, 'color')) {
+            $payload['color'] = $request->string('color')->toString();
+        }
+
+        if (Schema::hasTable($table) && Schema::hasColumn($table, 'password')) {
+            $payload['password'] = $request->string('password')->toString();
+        }
+
+        if (Schema::hasTable($table) && Schema::hasColumn($table, 'logo_url')) {
+            $payload['logo_url'] = '';
+        }
+
+        $registrationRequest = AgencyRegistrationRequest::query()->create($payload);
 
         $logo = $request->file('logo');
 
@@ -55,10 +68,15 @@ class AgencyRegistrationRequestController extends Controller
             ];
         }
 
-        $registrationRequest->forceFill([
-            'logo_url' => Storage::disk('public')->url($logoPath),
+        $updatePayload = [
             'documents' => $documents,
-        ])->save();
+        ];
+
+        if (Schema::hasTable($table) && Schema::hasColumn($table, 'logo_url')) {
+            $updatePayload['logo_url'] = Storage::disk('public')->url($logoPath);
+        }
+
+        $registrationRequest->forceFill($updatePayload)->save();
 
         return $this->successResponse(
             'Demande d enregistrement agence envoyee avec succes.',
