@@ -337,21 +337,8 @@ function getAdminAlertType(alert) {
 
 function RegisterAgency({ pendingRequests, onApproveRequest, approvingRequestId }) {
   return (
-    <Panel title="Enregistrer une agence" subtitle="Le compte agence doit etre cree uniquement depuis une demande envoyee par l'agence.">
+    <Panel title="Enregistrer une agence" subtitle="Demandes en attente">
       <div style={{ display: "grid", gap: 14 }}>
-        <div style={{ padding: "16px 18px", borderRadius: 20, background: S.amberSoft, border: `1px solid rgba(255,204,0,0.34)`, color: S.text, lineHeight: 1.7 }}>
-          L'agence doit d'abord envoyer sa demande depuis l'espace partenaire avec son email, telephone, mot de passe, logo et documents justificatifs. Ensuite seulement, l'administrateur peut l'enregistrer depuis l'onglet <strong>Messages</strong>.
-        </div>
-
-        <SectionCard title="Workflow obligatoire">
-          <div style={{ display: "grid", gap: 10, color: S.text2, fontSize: 14, lineHeight: 1.7 }}>
-            <div>1. L'agence remplit le formulaire de demande d'enregistrement.</div>
-            <div>2. La demande arrive dans les messages d'enregistrement agence.</div>
-            <div>3. L'admin ouvre la demande et clique sur <strong>Enregistrer l'agence</strong>.</div>
-            <div>4. Le compte agence recupere les vraies donnees de connexion envoyees par le partenaire.</div>
-          </div>
-        </SectionCard>
-
         <SectionCard title="Demandes en attente">
           {pendingRequests?.length ? (
             <div style={{ display: "grid", gap: 10 }}>
