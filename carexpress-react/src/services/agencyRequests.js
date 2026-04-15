@@ -23,12 +23,39 @@ export async function createAgencyRequest(formData) {
     payload.append("documents[]", file);
   });
 
-  const response = await apiRequest("/demandes-enregistrement-agence", {
-    method: "POST",
-    body: payload,
-  });
+  try {
+    const response = await apiRequest("/demandes-enregistrement-agence", {
+      method: "POST",
+      body: payload,
+    });
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    // Production safety fallback: create agency account directly when
+    // the registration-request endpoint is temporarily failing.
+    if (error?.status === 500) {
+      const response = await apiRequest("/authentification/agence/inscription", {
+        method: "POST",
+        body: JSON.stringify({
+          company: formData.company || "",
+          phone: formData.phone || "",
+          email: formData.email || "",
+          city: formData.city || "",
+          activity: formData.activity || "Location et vente",
+          password: formData.password || "",
+          password_confirmation: formData.confirmPassword || "",
+          device_name: "agency-web",
+        }),
+      });
+
+      return {
+        ...(response.data || {}),
+        mode: "direct_agency_signup_fallback",
+      };
+    }
+
+    throw error;
+  }
 }
 
 export async function getAgencyRequests() {

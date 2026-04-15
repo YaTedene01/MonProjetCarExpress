@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { useResponsive } from "../hooks/useResponsive";
 import { getPricingBands } from "../utils/pricing";
 import logo from "../assets/logofinal.png";
@@ -65,6 +65,8 @@ const roleConfig = {
 
 export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
   const config = roleConfig[role] || roleConfig.client;
+  const logoInputRef = useRef(null);
+  const documentsInputRef = useRef(null);
   const [formData, setFormData] = useState({
     identifier: "",
     email: "",
@@ -198,6 +200,12 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
       if (role === "agency" && agencyMode === "signup") {
         setSuccessMessage("Votre demande agence a ete envoyee. Vous pourrez vous connecter uniquement apres validation par l'administrateur.");
         setAgencyMode("login");
+        if (logoInputRef.current) {
+          logoInputRef.current.value = "";
+        }
+        if (documentsInputRef.current) {
+          documentsInputRef.current.value = "";
+        }
         setFormData({
           identifier: "",
           email: "",
@@ -436,8 +444,19 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
                     </label>
                     <label style={styles.fieldWrap}>
                       <span style={styles.label}>Logo de l'agence</span>
-                      <div style={{ ...styles.fileDropzone, ...(fieldErrors.logo ? styles.inputError : {}) }}>
-                        <input type="file" accept="image/*" onChange={handleLogoChange} style={{ display: "none" }} />
+                      <div
+                        style={{ ...styles.fileDropzone, ...(fieldErrors.logo ? styles.inputError : {}) }}
+                        onClick={() => logoInputRef.current?.click()}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            logoInputRef.current?.click();
+                          }
+                        }}
+                      >
+                        <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} style={{ display: "none" }} />
                         <span style={styles.fileButton}>Joindre le logo</span>
                         <span style={styles.fileText}>{formData.logo?.name || "JPG, PNG ou WEBP, 5 Mo maximum."}</span>
                       </div>
@@ -448,6 +467,7 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
                       error={fieldErrors.documents}
                       files={formData.documents}
                       onChange={handleDocumentsChange}
+                      inputRef={documentsInputRef}
                     />
                   </>
                 ) : (
@@ -541,12 +561,23 @@ function Field({ label, name, value, onChange, placeholder, type = "text", error
   );
 }
 
-function FileField({ label, error, hint, files, onChange }) {
+function FileField({ label, error, hint, files, onChange, inputRef }) {
   return (
     <label style={styles.fieldWrap}>
       <span style={styles.label}>{label}</span>
-      <div style={{ ...styles.fileDropzone, ...(error ? styles.inputError : {}) }}>
-        <input type="file" multiple onChange={onChange} style={{ display: "none" }} />
+      <div
+        style={{ ...styles.fileDropzone, ...(error ? styles.inputError : {}) }}
+        onClick={() => inputRef?.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            inputRef?.current?.click();
+          }
+        }}
+      >
+        <input ref={inputRef} type="file" multiple onChange={onChange} style={{ display: "none" }} />
         <span style={styles.fileButton}>Joindre des fichiers</span>
         <span style={styles.fileText}>NINEA, RCCM, piece d'identite, justificatifs administratifs.</span>
         {!!files?.length && (
