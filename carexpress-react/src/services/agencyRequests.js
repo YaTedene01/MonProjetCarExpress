@@ -61,11 +61,13 @@ export async function openAgencyRequestDocumentAtUrl(downloadUrl) {
   const file = downloadUrl.startsWith("http")
     ? await apiDownloadUrl(downloadUrl)
     : await apiDownload(downloadUrl);
+  const url = file.url;
 
   if (previewWindow) {
-    previewWindow.location.href = file.url;
+    previewWindow.location.href = url;
+    previewWindow.focus();
   } else {
-    window.location.href = file.url;
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   return file;

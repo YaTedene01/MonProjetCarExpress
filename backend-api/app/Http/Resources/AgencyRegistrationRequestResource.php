@@ -21,19 +21,19 @@ class AgencyRegistrationRequestResource extends JsonResource
             'address' => $this->address,
             'ninea' => $this->ninea,
             'color' => $this->color,
-            'logo_url' => $this->resolveLogoUrl($request),
+            'logo_url' => $this->resolveLogoUrl(),
             'status' => $this->status,
             'is_read' => $this->read_at !== null,
-            'documents' => collect($this->documents ?? [])->map(function (array $document, int $index) use ($request): array {
+            'documents' => collect($this->documents ?? [])->map(function (array $document, int $index): array {
                 return [
                     'id' => $index,
                     'name' => $document['name'] ?? 'document',
                     'mime_type' => $document['mime_type'] ?? 'application/octet-stream',
                     'size' => $document['size'] ?? 0,
-                    'download_url' => $request->getSchemeAndHttpHost().route('agency-registration-requests.documents.download', [
+                    'download_url' => route('agency-registration-requests.documents.download', [
                         'agencyRegistrationRequest' => $this->id,
                         'documentIndex' => $index,
-                    ], absolute: false),
+                    ], true),
                 ];
             })->values(),
             'created_at' => $this->created_at,
@@ -42,14 +42,14 @@ class AgencyRegistrationRequestResource extends JsonResource
         ];
     }
 
-    private function resolveLogoUrl(Request $request): ?string
+    private function resolveLogoUrl(): ?string
     {
         if (trim((string) $this->logo_url) === '') {
             return null;
         }
 
-        return $request->getSchemeAndHttpHost().route('agency-registration-requests.logo', [
+        return route('agency-registration-requests.logo', [
             'agencyRegistrationRequest' => $this->id,
-        ], absolute: false);
+        ], true);
     }
 }

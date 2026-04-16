@@ -56,7 +56,7 @@ class AgencyRegistrationRequestController extends Controller
 
         abort_unless(Storage::disk('local')->exists($document['path']), 404, 'Fichier introuvable.');
 
-        return Storage::disk('local')->download(
+        return Storage::disk('local')->response(
             $document['path'],
             $document['name'] ?? basename($document['path'])
         );
