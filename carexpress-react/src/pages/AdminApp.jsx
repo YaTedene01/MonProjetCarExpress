@@ -339,7 +339,7 @@ function getAdminAlertType(alert) {
   return "Notification";
 }
 
-function RegisterAgency({ pendingRequests, onApproveRequest, approvingRequestId }) {
+function RegisterAgency({ pendingRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument }) {
   return (
     <Panel title="Enregistrer une agence" subtitle="Demandes en attente">
       <div style={{ display: "grid", gap: 14 }}>
@@ -353,14 +353,45 @@ function RegisterAgency({ pendingRequests, onApproveRequest, approvingRequestId 
                     <Chip tone="gold">En attente</Chip>
                   </div>
 
-                  <div style={{ marginTop: 8, display: "grid", gap: 4, fontSize: 13, color: S.text3, lineHeight: 1.6 }}>
+                  <div style={{ marginTop: 10, display: "grid", gap: 5, fontSize: 13, color: S.text3, lineHeight: 1.6 }}>
+                    <div><strong style={{ color: S.text2 }}>Nom agence:</strong> {request.company || "Non renseigne"}</div>
                     <div><strong style={{ color: S.text2 }}>Ville:</strong> {request.city || "Non renseignee"}</div>
-                    <div><strong style={{ color: S.text2 }}>Email:</strong> {request.email || "Non renseigne"}</div>
+                    <div><strong style={{ color: S.text2 }}>Email professionnel:</strong> {request.email || "Non renseigne"}</div>
                     <div><strong style={{ color: S.text2 }}>Telephone:</strong> {request.phone || "Non renseigne"}</div>
                     <div><strong style={{ color: S.text2 }}>Activite:</strong> {request.activity || "Non renseignee"}</div>
                     <div><strong style={{ color: S.text2 }}>Responsable:</strong> {request.manager_name || "Non renseigne"}</div>
+                    <div><strong style={{ color: S.text2 }}>Quartier:</strong> {request.district || "Non renseigne"}</div>
+                    <div><strong style={{ color: S.text2 }}>Adresse:</strong> {request.address || "Non renseignee"}</div>
                     <div><strong style={{ color: S.text2 }}>NINEA:</strong> {request.ninea || "Non renseigne"}</div>
-                    <div><strong style={{ color: S.text2 }}>Documents:</strong> {request.documents?.length || 0} piece(s)</div>
+                    <div><strong style={{ color: S.text2 }}>Couleur:</strong> {request.color || "Non renseignee"}</div>
+                    <div><strong style={{ color: S.text2 }}>Statut:</strong> En attente</div>
+                  </div>
+
+                  {request.logo_url ? (
+                    <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: S.text2 }}>Logo fourni</div>
+                      <div style={{ width: 88, height: 88, borderRadius: 16, overflow: "hidden", border: `1px solid ${S.border}` }}>
+                        <img src={request.logo_url} alt={`Logo ${request.company}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: S.text2 }}>
+                      Documents fournis ({request.documents?.length || 0})
+                    </div>
+                    {request.documents?.length ? request.documents.map((document) => (
+                      <div key={`${request.id}-${document.id}`} style={{ padding: "10px 12px", borderRadius: 12, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.84)" }}>
+                        <div style={{ fontWeight: 600, color: S.text }}>{document.name}</div>
+                        <div style={{ marginTop: 4, fontSize: 12, color: S.text3 }}>
+                          {document.mime_type} · {Math.max(1, Math.round((document.size || 0) / 1024))} Ko
+                        </div>
+                        <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button type="button" onClick={() => onOpenDocument?.(request.id, document.id)} style={ghostButtonStyle()}>Voir</button>
+                          <button type="button" onClick={() => onDownloadDocument?.(request.id, document.id)} style={ghostButtonStyle()}>Telecharger</button>
+                        </div>
+                      </div>
+                    )) : <div style={{ fontSize: 12, color: S.text3 }}>Aucun document joint.</div>}
                   </div>
 
                   <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
