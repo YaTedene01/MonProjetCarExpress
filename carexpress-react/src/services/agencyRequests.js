@@ -58,19 +58,27 @@ export async function openAgencyRequestDocument(requestId, documentId) {
 
 export async function openAgencyRequestDocumentAtUrl(downloadUrl) {
   const previewWindow = window.open("", "_blank", "noopener,noreferrer");
-  const file = downloadUrl.startsWith("http")
-    ? await apiDownloadUrl(downloadUrl)
-    : await apiDownload(downloadUrl);
-  const url = file.url;
 
-  if (previewWindow) {
-    previewWindow.location.href = url;
-    previewWindow.focus();
-  } else {
-    window.open(url, "_blank", "noopener,noreferrer");
+  try {
+    const file = downloadUrl.startsWith("http")
+      ? await apiDownloadUrl(downloadUrl)
+      : await apiDownload(downloadUrl);
+    const url = file.url;
+
+    if (previewWindow) {
+      previewWindow.location.href = url;
+      previewWindow.focus();
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+
+    return file;
+  } catch (error) {
+    if (previewWindow) {
+      previewWindow.close();
+    }
+    throw error;
   }
-
-  return file;
 }
 
 export async function downloadAgencyRequestDocument(requestId, documentId) {
@@ -92,5 +100,9 @@ export async function downloadAgencyRequestDocumentAtUrl(downloadUrl) {
 }
 
 export async function loadAgencyRequestLogo(logoUrl) {
-  return apiDownloadUrl(logoUrl);
+  if (!logoUrl) {
+    throw new Error("Logo URL manquante.");
+  }
+
+  return logoUrl.startsWith("http") ? apiDownloadUrl(logoUrl) : apiDownload(logoUrl);
 }

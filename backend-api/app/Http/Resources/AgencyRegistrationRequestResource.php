@@ -30,10 +30,7 @@ class AgencyRegistrationRequestResource extends JsonResource
                     'name' => $document['name'] ?? 'document',
                     'mime_type' => $document['mime_type'] ?? 'application/octet-stream',
                     'size' => $document['size'] ?? 0,
-                    'download_url' => route('agency-registration-requests.documents.download', [
-                        'agencyRegistrationRequest' => $this->id,
-                        'documentIndex' => $index,
-                    ], true),
+                    'download_url' => "/administration/messages-demandes-agence/{$this->id}/documents/{$index}/telecharger",
                 ];
             })->values(),
             'created_at' => $this->created_at,
@@ -48,8 +45,6 @@ class AgencyRegistrationRequestResource extends JsonResource
             return null;
         }
 
-        return route('agency-registration-requests.logo', [
-            'agencyRegistrationRequest' => $this->id,
-        ], true);
+        return "/administration/messages-demandes-agence/{$this->id}/logo";
     }
 }
