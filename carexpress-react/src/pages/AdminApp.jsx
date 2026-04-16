@@ -149,7 +149,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
         }}
       />
       <section className="container-responsive" style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 20px 0" }}>
-        {page === "home" && <AdminHome agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} onApproveRequest={handleApproveAgencyRequest} approvingRequestId={approvingRequestId} />}
+        {page === "home" && <AdminHome agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} onApproveRequest={handleApproveAgencyRequest} approvingRequestId={approvingRequestId} onOpenDocument={openAgencyRequestDocument} onDownloadDocument={downloadAgencyRequestDocument} />}
         {page === "users" && <AdminUsers adminSearch={adminSearch} setAdminSearch={setAdminSearch} users={apiUsers} agencies={apiAgencies} />}
         {page === "agences" && <AdminAgences onViewAgency={setSelectedAgency} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} />}
         {page === "messages" && <AdminMessages requests={agencyRequests} selectedRequest={selectedRequest} approveError={approveError} approveSuccess={approveSuccess} approvingRequestId={approvingRequestId} onSelectRequest={async (request) => {
@@ -169,7 +169,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
   );
 }
 
-function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onAgencyCreated, agencyRequests, onApproveRequest, approvingRequestId }) {
+function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onAgencyCreated, agencyRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument }) {
   const [adminTab, setAdminTab] = useState("dashboard");
   const pendingAgencyRequests = agencyRequests.filter((request) => request.status === "pending");
 
@@ -189,13 +189,17 @@ function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, user
       </Panel>
 
       {!!pendingAgencyRequests.length && (
-        <Panel title="Notification de connexion" subtitle="Nouvelles demandes d'enregistrement agence recues">
+        <Panel title="Notifications" subtitle="Demandes agence recues">
           <div style={{ display: "grid", gap: 10 }}>
             {pendingAgencyRequests.slice(0, 2).map((request) => (
               <div key={request.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: "14px 16px", borderRadius: 18, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.78)" }}>
                 <div>
-                  <div style={{ fontWeight: 700, color: S.text }}>{request.company}</div>
-                  <div style={{ marginTop: 4, fontSize: 13, color: S.text3 }}>{request.city} · {request.activity} · {request.documents?.length || 0} document(s)</div>
+                  <div style={{ fontWeight: 700, color: S.text }}>
+                    L'agence {request.company} vous a envoye une demande.
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 13, color: S.text3 }}>
+                    Verifiez-la dans <strong>Enregistrer agence</strong>. Discussion possible dans l'onglet <strong>Messages</strong>.
+                  </div>
                 </div>
                 <Chip tone="gold">{request.is_read ? "Consultee" : "Nouvelle"}</Chip>
               </div>
@@ -219,7 +223,7 @@ function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, user
       </Panel>
 
       {adminTab === "dashboard" && <AdminDashboard adminSearch={adminSearch} agencies={agencies} users={users} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} />}
-      {adminTab === "register" && <RegisterAgency onAgencyCreated={onAgencyCreated} pendingRequests={pendingAgencyRequests} onApproveRequest={onApproveRequest} approvingRequestId={approvingRequestId} />}
+      {adminTab === "register" && <RegisterAgency onAgencyCreated={onAgencyCreated} pendingRequests={pendingAgencyRequests} onApproveRequest={onApproveRequest} approvingRequestId={approvingRequestId} onOpenDocument={onOpenDocument} onDownloadDocument={onDownloadDocument} />}
       {adminTab === "manage" && <ManageAgencies />}
     </div>
   );
