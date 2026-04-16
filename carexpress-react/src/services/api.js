@@ -177,3 +177,37 @@ export async function apiDownload(path) {
     mimeType: blob.type,
   };
 }
+
+export async function apiDownloadUrl(url) {
+  const session = readSession();
+  const headers = {};
+
+  if (session?.token) {
+    headers.Authorization = `Bearer ${session.token}`;
+  }
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "GET",
+      headers,
+    });
+  } catch {
+    throw new Error("Impossible de contacter le serveur pour recuperer le fichier.");
+  }
+
+  if (!response.ok) {
+    throw new Error("Impossible de recuperer le fichier.");
+  }
+
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get("content-disposition") || "";
+  const match = contentDisposition.match(/filename=\"?([^\"]+)\"?/i);
+
+  return {
+    blob,
+    filename: match?.[1] || "document",
+    url: URL.createObjectURL(blob),
+    mimeType: blob.type,
+  };
+}

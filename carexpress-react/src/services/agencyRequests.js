@@ -1,4 +1,4 @@
-import { apiDownload, apiRequest } from "./api";
+import { apiDownload, apiDownloadUrl, apiRequest } from "./api";
 
 export async function createAgencyRequest(formData) {
   const payload = new FormData();
@@ -75,4 +75,8 @@ export async function downloadAgencyRequestDocument(requestId, documentId) {
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(file.url), 1000);
   return file;
+}
+
+export async function loadAgencyRequestLogo(logoUrl) {
+  return apiDownloadUrl(logoUrl);
 }

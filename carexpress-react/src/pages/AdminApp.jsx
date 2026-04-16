@@ -4,7 +4,7 @@ import { AgencyProfilePage } from "../components/VehicleDetail";
 import ChatPanel from "../components/ChatPanel";
 import { adaptAdminAgency, adaptAdminUser } from "../services/adapters";
 import { fetchAdminAgencies, fetchAdminDashboard, fetchAdminUsers } from "../services/catalogue";
-import { approveAgencyRequest, downloadAgencyRequestDocument, getAgencyRequests, openAgencyRequestDocument } from "../services/agencyRequests";
+import { approveAgencyRequest, downloadAgencyRequestDocument, getAgencyRequests, loadAgencyRequestLogo, openAgencyRequestDocument } from "../services/agencyRequests";
 
 const S = {
   red: "#D40511",
@@ -551,16 +551,55 @@ function RegisterAgency({ pendingRequests, agencyRequestsLoading, agencyRequests
 
 function AgencyLogoPreview({ logoUrl, company }) {
   const [hasError, setHasError] = useState(false);
+  const [resolvedLogoUrl, setResolvedLogoUrl] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl = "";
+
+    setHasError(false);
+    setResolvedLogoUrl("");
+
+    if (!logoUrl) {
+      setHasError(true);
+      return undefined;
+    }
+
+    loadAgencyRequestLogo(logoUrl)
+      .then((file) => {
+        if (cancelled) {
+          URL.revokeObjectURL(file.url);
+          return;
+        }
+
+        objectUrl = file.url;
+        setResolvedLogoUrl(file.url);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHasError(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [logoUrl]);
 
   return (
     <div style={{ width: 88, height: 88, borderRadius: 16, overflow: "hidden", border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.9)", display: "grid", placeItems: "center" }}>
-      {!hasError ? (
+      {!hasError && resolvedLogoUrl ? (
         <img
-          src={logoUrl}
+          src={resolvedLogoUrl}
           alt={`Logo ${company}`}
           onError={() => setHasError(true)}
           style={{ width: "100%", height: "100%", objectFit: "cover" }}
         />
+      ) : !hasError ? (
+        <div style={{ fontSize: 12, color: S.text3 }}>Chargement...</div>
       ) : (
         <div style={{ padding: 10, textAlign: "center", fontSize: 12, fontWeight: 700, color: S.text3, lineHeight: 1.4 }}>
           Logo indisponible
