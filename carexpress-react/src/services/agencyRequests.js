@@ -53,8 +53,15 @@ export async function markAgencyRequestAsRead(requestId) {
 }
 
 export async function openAgencyRequestDocument(requestId, documentId) {
+  const previewWindow = window.open("", "_blank", "noopener,noreferrer");
   const file = await apiDownload(`/administration/messages-demandes-agence/${requestId}/documents/${documentId}/telecharger`);
-  window.open(file.url, "_blank", "noopener,noreferrer");
+
+  if (previewWindow) {
+    previewWindow.location.href = file.url;
+  } else {
+    window.location.href = file.url;
+  }
+
   return file;
 }
 
@@ -66,5 +73,6 @@ export async function downloadAgencyRequestDocument(requestId, documentId) {
   document.body.appendChild(link);
   link.click();
   link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(file.url), 1000);
   return file;
 }

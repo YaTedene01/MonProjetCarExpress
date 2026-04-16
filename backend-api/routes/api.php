@@ -109,6 +109,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/utilisateurs', [AdminUserController::class, 'index']);
             Route::get('/messages-demandes-agence', [AdminAgencyRegistrationRequestController::class, 'index']);
             Route::get('/messages-demandes-agence/{agencyRegistrationRequest}', [AdminAgencyRegistrationRequestController::class, 'show']);
+            Route::get('/messages-demandes-agence/{agencyRegistrationRequest}/logo', [AdminAgencyRegistrationRequestController::class, 'showLogo'])
+                ->name('agency-registration-requests.logo');
             Route::get('/messages-demandes-agence/{agencyRegistrationRequest}/documents/{documentIndex}/telecharger', [AdminAgencyRegistrationRequestController::class, 'downloadDocument'])
                 ->whereNumber('documentIndex')
                 ->name('agency-registration-requests.documents.download');

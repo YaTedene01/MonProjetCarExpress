@@ -87,7 +87,14 @@ export default function App() {
         <AgencyApp branding={agencyBranding} chatThreads={chatThreads} sendChatMessage={sendChatMessage} onLogout={handleAgencyLogout} onGoToLanding={handleGoToLanding} />
       )}
       {screen === 'app-admin' && (
-        <AdminApp agencyBranding={agencyBranding} onRegisterAgency={handleRegisterAgency} onLogout={handleAdminLogout} onGoToLanding={handleGoToLanding} />
+        <AdminApp
+          agencyBranding={agencyBranding}
+          chatThreads={chatThreads}
+          sendChatMessage={sendChatMessage}
+          onRegisterAgency={handleRegisterAgency}
+          onLogout={handleAdminLogout}
+          onGoToLanding={handleGoToLanding}
+        />
       )}
         </>
       )}

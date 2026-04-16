@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Topbar, BottomNav, ProfileMenuItem, Input, FormField, Select, Btn } from "../components/UI";
 import { AgencyProfilePage } from "../components/VehicleDetail";
+import ChatPanel from "../components/ChatPanel";
 import { adaptAdminAgency, adaptAdminUser } from "../services/adapters";
 import { fetchAdminAgencies, fetchAdminDashboard, fetchAdminUsers } from "../services/catalogue";
-import { approveAgencyRequest, downloadAgencyRequestDocument, getAgencyRequest, getAgencyRequests, openAgencyRequestDocument } from "../services/agencyRequests";
+import { approveAgencyRequest, downloadAgencyRequestDocument, getAgencyRequests, openAgencyRequestDocument } from "../services/agencyRequests";
 
 const S = {
   red: "#D40511",
@@ -61,7 +62,7 @@ const adminAlerts = [
   { type: "Echeance", title: "Maintenance de supervision prevue demain", detail: "Fenetre de controle plateforme · 03 avril 2026 a 02:00", tone: "blue" },
 ];
 
-export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, onGoToLanding }) {
+export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, chatThreads, sendChatMessage, onGoToLanding }) {
   const [page, setPage] = useState("home");
   const [selectedAgency, setSelectedAgency] = useState(null);
   const [adminSearch, setAdminSearch] = useState("");
@@ -70,10 +71,9 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
   const [dashboardAlerts, setDashboardAlerts] = useState(adminAlerts);
   const [agencyRequests, setAgencyRequests] = useState([]);
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [approveError, setApproveError] = useState("");
-  const [approveSuccess, setApproveSuccess] = useState("");
   const [approvingRequestId, setApprovingRequestId] = useState(null);
+  const [requestActionError, setRequestActionError] = useState("");
+  const [requestActionSuccess, setRequestActionSuccess] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -100,15 +100,14 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
   const unreadAgencyRequests = useMemo(() => agencyRequests.filter((request) => !request.is_read).length, [agencyRequests]);
 
   const handleApproveAgencyRequest = async (requestId) => {
-    setApproveError("");
-    setApproveSuccess("");
+    setRequestActionError("");
+    setRequestActionSuccess("");
     setApprovingRequestId(requestId);
 
     try {
       const approvedRequest = await approveAgencyRequest(requestId);
-      setSelectedRequest(approvedRequest);
       setAgencyRequests((current) => current.map((item) => item.id === approvedRequest.id ? approvedRequest : item));
-      setApproveSuccess("L'agence a bien ete enregistree.");
+      setRequestActionSuccess("L'agence a ete enregistree avec succes.");
 
       const [agencyRows, userRows] = await Promise.all([
         fetchAdminAgencies().catch(() => []),
@@ -118,10 +117,32 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
       if (agencyRows.length) setApiAgencies(agencyRows.map((agency) => adaptAdminAgency(agency)));
       if (userRows.length) setApiUsers(userRows.map((user) => adaptAdminUser(user)));
     } catch (error) {
-      setApproveError(error?.message || "Impossible d'enregistrer cette agence pour le moment.");
+      setRequestActionError(error?.message || "Impossible d'enregistrer cette agence pour le moment.");
       throw error;
     } finally {
       setApprovingRequestId(null);
+    }
+  };
+
+  const handleOpenRequestDocument = async (requestId, documentId) => {
+    setRequestActionError("");
+    setRequestActionSuccess("");
+
+    try {
+      await openAgencyRequestDocument(requestId, documentId);
+    } catch (error) {
+      setRequestActionError(error?.message || "Impossible d'ouvrir ce document.");
+    }
+  };
+
+  const handleDownloadRequestDocument = async (requestId, documentId) => {
+    setRequestActionError("");
+    setRequestActionSuccess("");
+
+    try {
+      await downloadAgencyRequestDocument(requestId, documentId);
+    } catch (error) {
+      setRequestActionError(error?.message || "Impossible de telecharger ce document.");
     }
   };
 
@@ -149,18 +170,10 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
         }}
       />
       <section className="container-responsive" style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 20px 0" }}>
-        {page === "home" && <AdminHome agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} onApproveRequest={handleApproveAgencyRequest} approvingRequestId={approvingRequestId} onOpenDocument={openAgencyRequestDocument} onDownloadDocument={downloadAgencyRequestDocument} />}
+        {page === "home" && <AdminHome agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} onApproveRequest={handleApproveAgencyRequest} approvingRequestId={approvingRequestId} onOpenDocument={handleOpenRequestDocument} onDownloadDocument={handleDownloadRequestDocument} requestActionError={requestActionError} requestActionSuccess={requestActionSuccess} />}
         {page === "users" && <AdminUsers adminSearch={adminSearch} setAdminSearch={setAdminSearch} users={apiUsers} agencies={apiAgencies} />}
         {page === "agences" && <AdminAgences onViewAgency={setSelectedAgency} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} />}
-        {page === "messages" && <AdminMessages requests={agencyRequests} selectedRequest={selectedRequest} approveError={approveError} approveSuccess={approveSuccess} approvingRequestId={approvingRequestId} onSelectRequest={async (request) => {
-          setApproveError("");
-          setApproveSuccess("");
-          const detailedRequest = await getAgencyRequest(request.id);
-          setSelectedRequest(detailedRequest);
-          setAgencyRequests((current) => current.map((item) => item.id === detailedRequest.id ? detailedRequest : item));
-        }} onOpenDocument={openAgencyRequestDocument} onDownloadDocument={downloadAgencyRequestDocument} onApproveRequest={async (requestId) => {
-          await handleApproveAgencyRequest(requestId);
-        }} />}
+        {page === "messages" && <AdminMessages chatThreads={chatThreads} sendChatMessage={sendChatMessage} />}
         {page === "systeme" && <AdminSysteme />}
         {page === "profil" && <AdminProfil onLogout={onLogout} />}
       </section>
@@ -169,7 +182,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, o
   );
 }
 
-function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onAgencyCreated, agencyRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument }) {
+function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onAgencyCreated, agencyRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument, requestActionError, requestActionSuccess }) {
   const [adminTab, setAdminTab] = useState("dashboard");
   const pendingAgencyRequests = agencyRequests.filter((request) => request.status === "pending");
 
@@ -223,7 +236,7 @@ function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, user
       </Panel>
 
       {adminTab === "dashboard" && <AdminDashboard adminSearch={adminSearch} agencies={agencies} users={users} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} />}
-      {adminTab === "register" && <RegisterAgency onAgencyCreated={onAgencyCreated} pendingRequests={pendingAgencyRequests} onApproveRequest={onApproveRequest} approvingRequestId={approvingRequestId} onOpenDocument={onOpenDocument} onDownloadDocument={onDownloadDocument} />}
+      {adminTab === "register" && <RegisterAgency onAgencyCreated={onAgencyCreated} pendingRequests={pendingAgencyRequests} onApproveRequest={onApproveRequest} approvingRequestId={approvingRequestId} onOpenDocument={onOpenDocument} onDownloadDocument={onDownloadDocument} requestActionError={requestActionError} requestActionSuccess={requestActionSuccess} />}
       {adminTab === "manage" && <ManageAgencies />}
     </div>
   );
@@ -339,11 +352,21 @@ function getAdminAlertType(alert) {
   return "Notification";
 }
 
-function RegisterAgency({ pendingRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument }) {
+function RegisterAgency({ pendingRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument, requestActionError, requestActionSuccess }) {
   return (
     <Panel title="Enregistrer une agence" subtitle="Demandes en attente">
       <div style={{ display: "grid", gap: 14 }}>
         <SectionCard title="Demandes en attente">
+          {requestActionError ? (
+            <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 14, border: "1px solid rgba(212,5,17,0.22)", background: "rgba(212,5,17,0.08)", color: S.red, fontSize: 13, lineHeight: 1.6 }}>
+              {requestActionError}
+            </div>
+          ) : null}
+          {requestActionSuccess ? (
+            <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 14, border: "1px solid rgba(26,122,46,0.22)", background: "rgba(26,122,46,0.1)", color: S.success, fontSize: 13, lineHeight: 1.6 }}>
+              {requestActionSuccess}
+            </div>
+          ) : null}
           {pendingRequests?.length ? (
             <div style={{ display: "grid", gap: 10 }}>
               {pendingRequests.map((request) => (
@@ -370,9 +393,7 @@ function RegisterAgency({ pendingRequests, onApproveRequest, approvingRequestId,
                   {request.logo_url ? (
                     <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: S.text2 }}>Logo fourni</div>
-                      <div style={{ width: 88, height: 88, borderRadius: 16, overflow: "hidden", border: `1px solid ${S.border}` }}>
-                        <img src={request.logo_url} alt={`Logo ${request.company}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      </div>
+                      <AgencyLogoPreview logoUrl={request.logo_url} company={request.company} />
                     </div>
                   ) : null}
 
@@ -419,6 +440,27 @@ function RegisterAgency({ pendingRequests, onApproveRequest, approvingRequestId,
         </SectionCard>
       </div>
     </Panel>
+  );
+}
+
+function AgencyLogoPreview({ logoUrl, company }) {
+  const [hasError, setHasError] = useState(false);
+
+  return (
+    <div style={{ width: 88, height: 88, borderRadius: 16, overflow: "hidden", border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.9)", display: "grid", placeItems: "center" }}>
+      {!hasError ? (
+        <img
+          src={logoUrl}
+          alt={`Logo ${company}`}
+          onError={() => setHasError(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : (
+        <div style={{ padding: 10, textAlign: "center", fontSize: 12, fontWeight: 700, color: S.text3, lineHeight: 1.4 }}>
+          Logo indisponible
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -602,141 +644,26 @@ function AdminAgences({ onViewAgency, adminSearch, setAdminSearch, agencies }) {
   );
 }
 
-function AdminMessages({ requests, selectedRequest, approveError, approveSuccess, approvingRequestId, onSelectRequest, onOpenDocument, onDownloadDocument, onApproveRequest }) {
-  const activeRequest = selectedRequest || null;
-  const isPending = activeRequest?.status === "pending";
-
+function AdminMessages({ chatThreads, sendChatMessage }) {
   return (
     <div style={{ display: "grid", gap: 18 }}>
       <div style={autoGrid(220)}>
-        <SoftMetric label="Demandes agence" value={String(requests.length)} sub="enregistrees dans le backend" />
-        <SoftMetric label="Non lues" value={String(requests.filter((request) => !request.is_read).length)} sub="a consulter" />
-        <SoftMetric label="Pieces jointes" value={String(requests.reduce((sum, request) => sum + (request.documents?.length || 0), 0))} sub="documents recus" />
+        <SoftMetric label="Conversations" value={String(chatThreads.length)} sub="echanges en cours" />
+        <SoftMetric label="Messages recus" value={String(chatThreads.reduce((sum, thread) => sum + thread.messages.filter((item) => item.senderRole !== "admin").length, 0))} sub="clients et agences" />
+        <SoftMetric label="Dossiers suivis" value={String(chatThreads.length)} sub="messages a traiter" />
       </div>
 
-      <Panel title="Messages d'enregistrement agence" subtitle="Selectionnez un message pour afficher le detail complet de la demande">
-        {requests.length ? (
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 360px) minmax(0, 1fr)", gap: 16 }}>
-            <div style={{ display: "grid", gap: 10 }}>
-              {requests.map((request) => (
-                <button
-                  key={request.id}
-                  type="button"
-                  onClick={() => onSelectRequest(request)}
-                  style={{
-                    textAlign: "left",
-                    padding: "16px 16px",
-                    borderRadius: 20,
-                    border: `1px solid ${activeRequest?.id === request.id ? S.black : S.border}`,
-                    background: activeRequest?.id === request.id ? "rgba(23,19,17,0.06)" : "rgba(255,255,255,0.76)",
-                    cursor: "pointer",
-                    boxShadow: activeRequest?.id === request.id ? "0 16px 34px rgba(17,17,17,0.08)" : "none",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
-                    <div>
-                      <div style={{ fontWeight: 700, color: S.text }}>{request.company}</div>
-                      <div style={{ marginTop: 3, fontSize: 12, color: S.text3 }}>{request.email}</div>
-                    </div>
-                    {!request.is_read && <span style={{ width: 10, height: 10, borderRadius: "50%", background: S.red, display: "inline-block", marginTop: 5 }} />}
-                  </div>
-                  <div style={{ marginTop: 10, fontSize: 13, color: S.text2, lineHeight: 1.6 }}>
-                    Demande d'enregistrement agence pour {request.activity?.toLowerCase() || "activite non renseignee"}.
-                  </div>
-                  <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, color: S.text3 }}>
-                    <span>{request.city}</span>
-                    <span>{request.documents?.length || 0} piece(s)</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {activeRequest && (
-              <div style={{ display: "grid", gap: 14, padding: 6 }}>
-                {approveError ? (
-                  <div style={{ padding: "12px 14px", borderRadius: 16, background: "rgba(212,5,17,0.08)", border: "1px solid rgba(212,5,17,0.22)", color: S.red, fontSize: 14, lineHeight: 1.6 }}>
-                    {approveError}
-                  </div>
-                ) : null}
-                {approveSuccess ? (
-                  <div style={{ padding: "12px 14px", borderRadius: 16, background: "rgba(26,122,46,0.12)", border: "1px solid rgba(26,122,46,0.22)", color: S.success, fontSize: 14, lineHeight: 1.6 }}>
-                    {approveSuccess}
-                  </div>
-                ) : null}
-
-                <div style={{ padding: "16px 18px", borderRadius: 20, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.78)" }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: S.text }}>{activeRequest.company}</div>
-                  <div style={{ marginTop: 6, color: S.text3, fontSize: 14 }}>{activeRequest.activity} · {activeRequest.city}</div>
-                  <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <Chip tone={isPending ? "gold" : "success"}>{isPending ? "En attente" : "Enregistree"}</Chip>
-                    {isPending && (
-                      <button
-                        type="button"
-                        onClick={() => onApproveRequest(activeRequest.id)}
-                        disabled={approvingRequestId === activeRequest.id}
-                        style={{
-                          ...ghostButtonStyle(),
-                          borderColor: S.success,
-                          color: S.success,
-                          opacity: approvingRequestId === activeRequest.id ? 0.7 : 1,
-                          cursor: approvingRequestId === activeRequest.id ? "wait" : "pointer",
-                        }}
-                      >
-                        {approvingRequestId === activeRequest.id ? "Enregistrement..." : "Enregistrer l'agence"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <InfoCard title="Informations agence" items={[
-                  { label: "Responsable", value: activeRequest.manager_name || "Non renseigne" },
-                  { label: "Telephone", value: activeRequest.phone || "Non renseigne" },
-                  { label: "Email", value: activeRequest.email || "Non renseigne" },
-                  { label: "Couleur", value: activeRequest.color || "Non renseignee" },
-                  { label: "Quartier", value: activeRequest.district || "Non renseigne" },
-                  { label: "Adresse", value: activeRequest.address || "Non renseignee" },
-                  { label: "NINEA / RCCM", value: activeRequest.ninea || "Non renseigne" },
-                ]} />
-
-                {activeRequest.logo_url && (
-                  <Panel title="Logo agence" subtitle="Identite visuelle transmise dans la demande">
-                    <div style={{ width: 90, height: 90, borderRadius: 20, overflow: "hidden", border: `1px solid ${S.border}` }}>
-                      <img src={activeRequest.logo_url} alt="Logo agence" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    </div>
-                  </Panel>
-                )}
-
-                <Panel title="Documents recus" subtitle="Pieces transmises par l'agence">
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {activeRequest.documents?.length ? activeRequest.documents.map((document) => (
-                      <div key={document.id} style={{ padding: "12px 14px", borderRadius: 16, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.76)" }}>
-                        <div style={{ fontWeight: 600, color: S.text }}>{document.name}</div>
-                        <div style={{ marginTop: 4, fontSize: 12, color: S.text3 }}>{document.mime_type} · {Math.max(1, Math.round(document.size / 1024))} Ko</div>
-                        <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                          <button type="button" onClick={() => onOpenDocument(activeRequest.id, document.id)} style={ghostButtonStyle()}>Voir</button>
-                          <button type="button" onClick={() => onDownloadDocument(activeRequest.id, document.id)} style={ghostButtonStyle()}>Telecharger</button>
-                        </div>
-                      </div>
-                    )) : <EmptyText>Aucun document joint.</EmptyText>}
-                  </div>
-                </Panel>
-              </div>
-            )}
-
-            {!activeRequest && (
-              <div style={{ display: "grid", placeItems: "center", minHeight: 420, padding: 24, borderRadius: 24, border: `1px dashed ${S.borderStrong}`, background: "rgba(255,255,255,0.46)" }}>
-                <div style={{ maxWidth: 420, textAlign: "center" }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: S.text }}>Selectionnez un message</div>
-                  <div style={{ marginTop: 8, fontSize: 14, color: S.text3, lineHeight: 1.7 }}>
-                    Le detail complet de la demande agence s'affichera ici uniquement apres un clic sur un message de la liste.
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <EmptyText>Aucune demande d'enregistrement agence pour le moment.</EmptyText>
-        )}
+      <Panel title="Messagerie" subtitle="Envoyez et recevez des messages.">
+        <ChatPanel
+          threads={chatThreads}
+          accent={S.red}
+          currentRole="admin"
+          currentName="Admin Car Express"
+          listTitle="Conversations"
+          emptyTitle="Aucune conversation"
+          emptySubtitle="Les echanges avec les clients et les agences apparaitront ici."
+          onSend={sendChatMessage}
+        />
       </Panel>
     </div>
   );
@@ -945,21 +872,6 @@ function SearchResultRow({ result }) {
 
 function EmptyText({ children }) {
   return <div style={{ paddingTop: 12, color: S.text3, fontSize: 13 }}>{children}</div>;
-}
-
-function InfoCard({ title, items }) {
-  return (
-    <Panel title={title} subtitle="Synthese detaillee de la demande recue">
-      <div style={{ display: "grid", gap: 12 }}>
-        {items.map((item) => (
-          <div key={item.label} style={{ display: "grid", gap: 5, padding: "13px 14px", borderRadius: 16, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.76)" }}>
-            <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: S.text3 }}>{item.label}</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: S.text, lineHeight: 1.6 }}>{item.value}</div>
-          </div>
-        ))}
-      </div>
-    </Panel>
-  );
 }
 
 function SoftMetric({ label, value, sub }) {

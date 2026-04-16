@@ -77,7 +77,7 @@ class AgencyRegistrationRequestController extends Controller
                     Str::uuid()->toString().'.'.$logo->getClientOriginalExtension(),
                     'public'
                 );
-                $logoUrl = Storage::disk('public')->url($logoPath);
+                $logoUrl = '/storage/'.$logoPath;
 
                 foreach ($this->resolveDocumentFiles($request) as $file) {
                     $storedPath = $file->storeAs(

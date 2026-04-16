@@ -10,6 +10,7 @@ use App\Repository\AgencyRepository;
 use App\Repository\UserRepository;
 use App\Utils\GenererReference;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -61,6 +62,16 @@ class AgencyRegistrationRequestController extends Controller
         );
     }
 
+    public function showLogo(AgencyRegistrationRequest $agencyRegistrationRequest)
+    {
+        $logoPath = $this->extractPublicStoragePath($agencyRegistrationRequest->logo_url);
+
+        abort_unless($logoPath !== null, 404, 'Logo introuvable.');
+        abort_unless(Storage::disk('public')->exists($logoPath), 404, 'Logo introuvable.');
+
+        return Storage::disk('public')->response($logoPath);
+    }
+
     public function approve(AgencyRegistrationRequest $agencyRegistrationRequest): JsonResponse
     {
         if ($agencyRegistrationRequest->status === 'approved') {
@@ -93,62 +104,74 @@ class AgencyRegistrationRequestController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($agencyRegistrationRequest): void {
-            [$contactFirstName, $contactLastName] = $this->splitManagerName($agencyRegistrationRequest->manager_name);
+        try {
+            DB::transaction(function () use ($agencyRegistrationRequest): void {
+                [$contactFirstName, $contactLastName] = $this->splitManagerName($agencyRegistrationRequest->manager_name);
 
-            $agency = $this->agencies->create([
-                'name' => $agencyRegistrationRequest->company,
-                'slug' => GenererReference::slug($agencyRegistrationRequest->company),
-                'activity' => $agencyRegistrationRequest->activity ?: 'Location et vente',
-                'city' => $agencyRegistrationRequest->city,
-                'district' => $agencyRegistrationRequest->district,
-                'address' => $agencyRegistrationRequest->address,
-                'contact_first_name' => $contactFirstName,
-                'contact_last_name' => $contactLastName,
-                'contact_phone' => $agencyRegistrationRequest->phone,
-                'contact_email' => $agencyRegistrationRequest->email,
-                'ninea' => $agencyRegistrationRequest->ninea,
-                'color' => $agencyRegistrationRequest->color ?: '#D40511',
-                'logo_url' => $agencyRegistrationRequest->logo_url,
-                'status' => 'pending',
-                'documents' => $agencyRegistrationRequest->documents,
-                'metadata' => [
-                    'source' => 'agency_registration_request',
-                    'registration_request_id' => $agencyRegistrationRequest->id,
-                    'registration_request_snapshot' => [
-                        'company' => $agencyRegistrationRequest->company,
-                        'manager_name' => $agencyRegistrationRequest->manager_name,
-                        'email' => $agencyRegistrationRequest->email,
-                        'phone' => $agencyRegistrationRequest->phone,
-                        'city' => $agencyRegistrationRequest->city,
-                        'activity' => $agencyRegistrationRequest->activity,
-                        'district' => $agencyRegistrationRequest->district,
-                        'address' => $agencyRegistrationRequest->address,
-                        'ninea' => $agencyRegistrationRequest->ninea,
-                        'color' => $agencyRegistrationRequest->color,
-                        'logo_url' => $agencyRegistrationRequest->logo_url,
-                        'documents' => $agencyRegistrationRequest->documents,
+                $agency = $this->agencies->create([
+                    'name' => $agencyRegistrationRequest->company,
+                    'slug' => GenererReference::slug($agencyRegistrationRequest->company),
+                    'activity' => $agencyRegistrationRequest->activity ?: 'Location et vente',
+                    'city' => $agencyRegistrationRequest->city,
+                    'district' => $agencyRegistrationRequest->district,
+                    'address' => $agencyRegistrationRequest->address,
+                    'contact_first_name' => $contactFirstName,
+                    'contact_last_name' => $contactLastName,
+                    'contact_phone' => $agencyRegistrationRequest->phone,
+                    'contact_email' => $agencyRegistrationRequest->email,
+                    'ninea' => $agencyRegistrationRequest->ninea,
+                    'color' => $agencyRegistrationRequest->color ?: '#D40511',
+                    'logo_url' => $agencyRegistrationRequest->logo_url,
+                    'status' => 'pending',
+                    'documents' => $agencyRegistrationRequest->documents,
+                    'metadata' => [
+                        'source' => 'agency_registration_request',
+                        'registration_request_id' => $agencyRegistrationRequest->id,
+                        'registration_request_snapshot' => [
+                            'company' => $agencyRegistrationRequest->company,
+                            'manager_name' => $agencyRegistrationRequest->manager_name,
+                            'email' => $agencyRegistrationRequest->email,
+                            'phone' => $agencyRegistrationRequest->phone,
+                            'city' => $agencyRegistrationRequest->city,
+                            'activity' => $agencyRegistrationRequest->activity,
+                            'district' => $agencyRegistrationRequest->district,
+                            'address' => $agencyRegistrationRequest->address,
+                            'ninea' => $agencyRegistrationRequest->ninea,
+                            'color' => $agencyRegistrationRequest->color,
+                            'logo_url' => $agencyRegistrationRequest->logo_url,
+                            'documents' => $agencyRegistrationRequest->documents,
+                        ],
                     ],
-                ],
-            ]);
+                ]);
 
-            $this->users->create([
-                'agency_id' => $agency->id,
-                'role' => UserRole::Agency,
-                'name' => $agencyRegistrationRequest->manager_name ?: $agencyRegistrationRequest->company,
-                'email' => $agencyRegistrationRequest->email,
-                'phone' => $agencyRegistrationRequest->phone,
-                'city' => $agencyRegistrationRequest->city,
-                'password' => $agencyRegistrationRequest->password,
-                'status' => 'active',
-            ]);
+                $this->users->create([
+                    'agency_id' => $agency->id,
+                    'role' => UserRole::Agency,
+                    'name' => $agencyRegistrationRequest->manager_name ?: $agencyRegistrationRequest->company,
+                    'email' => $agencyRegistrationRequest->email,
+                    'phone' => $agencyRegistrationRequest->phone,
+                    'city' => $agencyRegistrationRequest->city,
+                    'password' => $agencyRegistrationRequest->password,
+                    'status' => 'active',
+                ]);
 
-            $agencyRegistrationRequest->forceFill([
-                'status' => 'approved',
-                'reviewed_at' => now(),
-                'read_at' => $agencyRegistrationRequest->read_at ?? now(),
-            ])->save();
-        });
+                $agencyRegistrationRequest->forceFill([
+                    'status' => 'approved',
+                    'reviewed_at' => now(),
+                    'read_at' => $agencyRegistrationRequest->read_at ?? now(),
+                ])->save();
+            });
+        } catch (QueryException $exception) {
+            $sqlState = (string) ($exception->errorInfo[0] ?? '');
+
+            if ($sqlState === '23505') {
+                throw ValidationException::withMessages([
+                    'request' => ['Une agence ou un utilisateur existe deja avec ces informations.'],
+                ]);
+            }
+
+            throw $exception;
+        }
 
         return $this->successResponse(
             'Demande agence enregistree avec succes.',
@@ -169,5 +192,23 @@ class AgencyRegistrationRequestController extends Controller
         $lastName = $parts !== [] ? implode(' ', $parts) : null;
 
         return [$firstName, $lastName];
+    }
+
+    private function extractPublicStoragePath(?string $value): ?string
+    {
+        $path = trim((string) $value);
+
+        if ($path === '') {
+            return null;
+        }
+
+        $parsedPath = parse_url($path, PHP_URL_PATH);
+        $normalizedPath = is_string($parsedPath) && $parsedPath !== '' ? $parsedPath : $path;
+
+        if (! str_starts_with($normalizedPath, '/storage/')) {
+            return null;
+        }
+
+        return ltrim(substr($normalizedPath, strlen('/storage/')), '/');
     }
 }
