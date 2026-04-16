@@ -24,7 +24,7 @@ class AgencyRegistrationRequestResource extends JsonResource
             'logo_url' => $this->resolveLogoUrl($request),
             'status' => $this->status,
             'is_read' => $this->read_at !== null,
-            'documents' => collect($this->documents ?? [])->map(function (array $document, int $index): array {
+            'documents' => collect($this->documents ?? [])->map(function (array $document, int $index) use ($request): array {
                 return [
                     'id' => $index,
                     'name' => $document['name'] ?? 'document',
