@@ -43,7 +43,9 @@ class AgencyRegistrationRequestController extends Controller
             $set('address', $request->string('address')->toString());
             $set('ninea', $request->string('ninea')->toString());
             $set('status', 'pending');
-            $set('documents', []);
+            // Query Builder does not apply model casts during insert.
+            // Encode JSON payload explicitly for PostgreSQL JSON/JSONB columns.
+            $set('documents', json_encode([], JSON_UNESCAPED_UNICODE));
             $set('color', $request->string('color')->toString());
             $set('password', $request->string('password')->toString());
             $set('logo_url', '');
