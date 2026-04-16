@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Topbar, BottomNav, ProfileMenuItem, Input, FormField, Select, Btn } from "../components/UI";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Topbar, BottomNav, ProfileMenuItem, Input, FormField, Select, Btn, Notification } from "../components/UI";
 import { AgencyProfilePage } from "../components/VehicleDetail";
 import ChatPanel from "../components/ChatPanel";
 import { adaptAdminAgency, adaptAdminUser } from "../services/adapters";
@@ -74,27 +74,94 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
   const [approvingRequestId, setApprovingRequestId] = useState(null);
   const [requestActionError, setRequestActionError] = useState("");
   const [requestActionSuccess, setRequestActionSuccess] = useState("");
+  const [liveNotif, setLiveNotif] = useState(null);
+  const hasLoadedRequestsRef = useRef(false);
+  const knownRequestIdsRef = useRef(new Set());
 
-  useEffect(() => {
-    Promise.all([
+  const loadAdminData = async ({ silent = false } = {}) => {
+    const [agencyRows, userRows, dashboard, requests] = await Promise.all([
       fetchAdminAgencies().catch(() => []),
       fetchAdminUsers().catch(() => []),
       fetchAdminDashboard().catch(() => null),
       getAgencyRequests().catch(() => []),
-    ]).then(([agencyRows, userRows, dashboard, requests]) => {
-      if (agencyRows.length) setApiAgencies(agencyRows.map((agency) => adaptAdminAgency(agency)));
-      if (userRows.length) setApiUsers(userRows.map((user) => adaptAdminUser(user)));
-      if (dashboard?.metrics) setDashboardMetrics(dashboard.metrics);
-      if (dashboard?.alerts?.length) {
-        setDashboardAlerts(dashboard.alerts.map((alert) => ({
-          type: getAdminAlertType(alert),
-          title: alert.title,
-          detail: alert.message,
-          tone: getAdminAlertTone(alert),
-        })));
+    ]);
+
+    if (agencyRows.length) {
+      setApiAgencies(agencyRows.map((agency) => adaptAdminAgency(agency)));
+    } else if (!silent) {
+      setApiAgencies(agencies);
+    }
+
+    if (userRows.length) {
+      setApiUsers(userRows.map((user) => adaptAdminUser(user)));
+    } else if (!silent) {
+      setApiUsers(users);
+    }
+
+    if (dashboard?.metrics) {
+      setDashboardMetrics(dashboard.metrics);
+    } else if (!silent) {
+      setDashboardMetrics(null);
+    }
+
+    if (dashboard?.alerts?.length) {
+      setDashboardAlerts(dashboard.alerts.map((alert) => ({
+        type: getAdminAlertType(alert),
+        title: alert.title,
+        detail: alert.message,
+        tone: getAdminAlertTone(alert),
+      })));
+    } else if (!silent) {
+      setDashboardAlerts(adminAlerts);
+    }
+
+    setAgencyRequests(requests);
+
+    const nextKnownIds = new Set(requests.map((request) => request.id));
+
+    if (hasLoadedRequestsRef.current) {
+      const newPendingRequests = requests.filter((request) => (
+        request.status === "pending"
+        && !knownRequestIdsRef.current.has(request.id)
+      ));
+
+      if (newPendingRequests.length) {
+        const latestRequest = newPendingRequests[0];
+        setLiveNotif({
+          icon: "🔔",
+          title: "Nouvelle demande agence",
+          msg: `${latestRequest.company || "Une agence"} a envoye une demande d'enregistrement. Rendez-vous sur l'accueil pour la traiter.`,
+        });
       }
-      setAgencyRequests(requests);
-    });
+    }
+
+    knownRequestIdsRef.current = nextKnownIds;
+    hasLoadedRequestsRef.current = true;
+  };
+
+  useEffect(() => {
+    loadAdminData();
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      loadAdminData({ silent: true });
+    }, 10000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadAdminData({ silent: true });
+      }
+    };
+
+    window.addEventListener("focus", handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   const unreadAgencyRequests = useMemo(() => agencyRequests.filter((request) => !request.is_read).length, [agencyRequests]);
@@ -109,13 +176,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
       setAgencyRequests((current) => current.map((item) => item.id === approvedRequest.id ? approvedRequest : item));
       setRequestActionSuccess("L'agence a ete enregistree avec succes.");
 
-      const [agencyRows, userRows] = await Promise.all([
-        fetchAdminAgencies().catch(() => []),
-        fetchAdminUsers().catch(() => []),
-      ]);
-
-      if (agencyRows.length) setApiAgencies(agencyRows.map((agency) => adaptAdminAgency(agency)));
-      if (userRows.length) setApiUsers(userRows.map((user) => adaptAdminUser(user)));
+      await loadAdminData({ silent: true });
     } catch (error) {
       setRequestActionError(error?.message || "Impossible d'enregistrer cette agence pour le moment.");
       throw error;
@@ -147,10 +208,10 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
   };
 
   const navItems = [
-    { key: "home", icon: "home", label: "Accueil" },
+    { key: "home", icon: "home", label: "Accueil", badge: unreadAgencyRequests > 0 },
     { key: "users", icon: "users", label: "Utilisateurs" },
     { key: "agences", icon: "grid", label: "Agences" },
-    { key: "messages", icon: "bell", label: "Messages", badge: unreadAgencyRequests > 0 },
+    { key: "messages", icon: "bell", label: "Messages" },
     { key: "systeme", icon: "settings", label: "Systeme" },
     { key: "profil", icon: "user", label: "Profil" },
   ];
@@ -158,6 +219,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #f7f2eb 0%, #faf7f3 46%, #f4eee7 100%)", paddingBottom: 92 }}>
       {selectedAgency && <AgencyProfilePage vehicle={{ agency: selectedAgency.name }} onClose={() => setSelectedAgency(null)} />}
+      {liveNotif && <Notification notif={liveNotif} onClose={() => setLiveNotif(null)} />}
       <Topbar
         badge={{ label: "Super admin", bg: "rgba(17,17,17,0.08)", color: "#17130f" }}
         right="Supervision plateforme"
@@ -211,10 +273,15 @@ function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, user
                     L'agence {request.company} vous a envoye une demande.
                   </div>
                   <div style={{ marginTop: 4, fontSize: 13, color: S.text3 }}>
-                    Verifiez-la dans <strong>Enregistrer agence</strong>. Discussion possible dans l'onglet <strong>Messages</strong>.
+                    Verifiez-la dans <strong>Enregistrer agence</strong> depuis cette page d'accueil.
                   </div>
                 </div>
-                <Chip tone="gold">{request.is_read ? "Consultee" : "Nouvelle"}</Chip>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                  <Chip tone="gold">{request.is_read ? "Consultee" : "Nouvelle"}</Chip>
+                  <button type="button" onClick={() => setAdminTab("register")} style={ghostButtonStyle()}>
+                    Voir la demande
+                  </button>
+                </div>
               </div>
             ))}
           </div>
