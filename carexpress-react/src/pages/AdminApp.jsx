@@ -71,6 +71,8 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
   const [dashboardAlerts, setDashboardAlerts] = useState(adminAlerts);
   const [agencyRequests, setAgencyRequests] = useState([]);
+  const [agencyRequestsLoading, setAgencyRequestsLoading] = useState(true);
+  const [agencyRequestsError, setAgencyRequestsError] = useState("");
   const [approvingRequestId, setApprovingRequestId] = useState(null);
   const [requestActionError, setRequestActionError] = useState("");
   const [requestActionSuccess, setRequestActionSuccess] = useState("");
@@ -79,11 +81,14 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
   const knownRequestIdsRef = useRef(new Set());
 
   const loadAdminData = async ({ silent = false } = {}) => {
-    const [agencyRows, userRows, dashboard, requests] = await Promise.all([
+    if (!silent) {
+      setAgencyRequestsLoading(true);
+    }
+
+    const [agencyRows, userRows, dashboard] = await Promise.all([
       fetchAdminAgencies().catch(() => []),
       fetchAdminUsers().catch(() => []),
       fetchAdminDashboard().catch(() => null),
-      getAgencyRequests().catch(() => []),
     ]);
 
     if (agencyRows.length) {
@@ -115,28 +120,36 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
       setDashboardAlerts(adminAlerts);
     }
 
-    setAgencyRequests(requests);
+    try {
+      const requests = await getAgencyRequests();
+      setAgencyRequests(requests);
+      setAgencyRequestsError("");
 
-    const nextKnownIds = new Set(requests.map((request) => request.id));
+      const nextKnownIds = new Set(requests.map((request) => request.id));
 
-    if (hasLoadedRequestsRef.current) {
-      const newPendingRequests = requests.filter((request) => (
-        request.status === "pending"
-        && !knownRequestIdsRef.current.has(request.id)
-      ));
+      if (hasLoadedRequestsRef.current) {
+        const newPendingRequests = requests.filter((request) => (
+          request.status === "pending"
+          && !knownRequestIdsRef.current.has(request.id)
+        ));
 
-      if (newPendingRequests.length) {
-        const latestRequest = newPendingRequests[0];
-        setLiveNotif({
-          icon: "🔔",
-          title: "Nouvelle demande agence",
-          msg: `${latestRequest.company || "Une agence"} a envoye une demande d'enregistrement. Rendez-vous sur l'accueil pour la traiter.`,
-        });
+        if (newPendingRequests.length) {
+          const latestRequest = newPendingRequests[0];
+          setLiveNotif({
+            icon: "🔔",
+            title: "Nouvelle demande agence",
+            msg: `${latestRequest.company || "Une agence"} a envoye une demande d'enregistrement. Rendez-vous sur l'accueil pour la traiter.`,
+          });
+        }
       }
-    }
 
-    knownRequestIdsRef.current = nextKnownIds;
-    hasLoadedRequestsRef.current = true;
+      knownRequestIdsRef.current = nextKnownIds;
+      hasLoadedRequestsRef.current = true;
+    } catch (error) {
+      setAgencyRequestsError(error?.message || "Impossible de recuperer les demandes agence pour le moment.");
+    } finally {
+      setAgencyRequestsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -232,7 +245,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
         }}
       />
       <section className="container-responsive" style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 20px 0" }}>
-        {page === "home" && <AdminHome agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} onApproveRequest={handleApproveAgencyRequest} approvingRequestId={approvingRequestId} onOpenDocument={handleOpenRequestDocument} onDownloadDocument={handleDownloadRequestDocument} requestActionError={requestActionError} requestActionSuccess={requestActionSuccess} />}
+        {page === "home" && <AdminHome agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} agencyRequestsLoading={agencyRequestsLoading} agencyRequestsError={agencyRequestsError} onRetryAgencyRequests={() => loadAdminData()} onApproveRequest={handleApproveAgencyRequest} approvingRequestId={approvingRequestId} onOpenDocument={handleOpenRequestDocument} onDownloadDocument={handleDownloadRequestDocument} requestActionError={requestActionError} requestActionSuccess={requestActionSuccess} />}
         {page === "users" && <AdminUsers adminSearch={adminSearch} setAdminSearch={setAdminSearch} users={apiUsers} agencies={apiAgencies} />}
         {page === "agences" && <AdminAgences onViewAgency={setSelectedAgency} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} />}
         {page === "messages" && <AdminMessages chatThreads={chatThreads} sendChatMessage={sendChatMessage} />}
@@ -244,7 +257,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
   );
 }
 
-function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onAgencyCreated, agencyRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument, requestActionError, requestActionSuccess }) {
+function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onAgencyCreated, agencyRequests, agencyRequestsLoading, agencyRequestsError, onRetryAgencyRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument, requestActionError, requestActionSuccess }) {
   const [adminTab, setAdminTab] = useState("dashboard");
   const pendingAgencyRequests = agencyRequests.filter((request) => request.status === "pending");
 
@@ -263,7 +276,22 @@ function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, user
         />
       </Panel>
 
-      {!!pendingAgencyRequests.length && (
+      {agencyRequestsError ? (
+        <Panel title="Notifications" subtitle="Demandes agence recues">
+          <div style={{ padding: "14px 16px", borderRadius: 18, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.78)", display: "grid", gap: 10 }}>
+            <div style={{ color: S.red, fontSize: 14, lineHeight: 1.6 }}>
+              {agencyRequestsError}
+            </div>
+            <div>
+              <button type="button" onClick={onRetryAgencyRequests} style={ghostButtonStyle()}>
+                Reessayer
+              </button>
+            </div>
+          </div>
+        </Panel>
+      ) : null}
+
+      {!agencyRequestsError && !!pendingAgencyRequests.length && (
         <Panel title="Notifications" subtitle="Demandes agence recues">
           <div style={{ display: "grid", gap: 10 }}>
             {pendingAgencyRequests.slice(0, 2).map((request) => (
@@ -303,7 +331,7 @@ function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, user
       </Panel>
 
       {adminTab === "dashboard" && <AdminDashboard adminSearch={adminSearch} agencies={agencies} users={users} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} />}
-      {adminTab === "register" && <RegisterAgency onAgencyCreated={onAgencyCreated} pendingRequests={pendingAgencyRequests} onApproveRequest={onApproveRequest} approvingRequestId={approvingRequestId} onOpenDocument={onOpenDocument} onDownloadDocument={onDownloadDocument} requestActionError={requestActionError} requestActionSuccess={requestActionSuccess} />}
+      {adminTab === "register" && <RegisterAgency onAgencyCreated={onAgencyCreated} pendingRequests={pendingAgencyRequests} agencyRequestsLoading={agencyRequestsLoading} agencyRequestsError={agencyRequestsError} onRetryAgencyRequests={onRetryAgencyRequests} onApproveRequest={onApproveRequest} approvingRequestId={approvingRequestId} onOpenDocument={onOpenDocument} onDownloadDocument={onDownloadDocument} requestActionError={requestActionError} requestActionSuccess={requestActionSuccess} />}
       {adminTab === "manage" && <ManageAgencies />}
     </div>
   );
@@ -419,7 +447,7 @@ function getAdminAlertType(alert) {
   return "Notification";
 }
 
-function RegisterAgency({ pendingRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument, requestActionError, requestActionSuccess }) {
+function RegisterAgency({ pendingRequests, agencyRequestsLoading, agencyRequestsError, onRetryAgencyRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument, requestActionError, requestActionSuccess }) {
   return (
     <Panel title="Enregistrer une agence" subtitle="Demandes en attente">
       <div style={{ display: "grid", gap: 14 }}>
@@ -434,7 +462,18 @@ function RegisterAgency({ pendingRequests, onApproveRequest, approvingRequestId,
               {requestActionSuccess}
             </div>
           ) : null}
-          {pendingRequests?.length ? (
+          {agencyRequestsLoading ? (
+            <EmptyText>Chargement des demandes agence...</EmptyText>
+          ) : agencyRequestsError ? (
+            <div style={{ display: "grid", gap: 12 }}>
+              <div style={{ color: S.red, fontSize: 14, lineHeight: 1.6 }}>{agencyRequestsError}</div>
+              <div>
+                <button type="button" onClick={onRetryAgencyRequests} style={ghostButtonStyle()}>
+                  Recharger les demandes
+                </button>
+              </div>
+            </div>
+          ) : pendingRequests?.length ? (
             <div style={{ display: "grid", gap: 10 }}>
               {pendingRequests.map((request) => (
                 <div key={request.id} style={{ padding: "12px 14px", borderRadius: 16, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.76)" }}>
