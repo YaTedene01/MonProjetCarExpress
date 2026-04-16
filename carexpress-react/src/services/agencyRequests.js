@@ -53,8 +53,14 @@ export async function markAgencyRequestAsRead(requestId) {
 }
 
 export async function openAgencyRequestDocument(requestId, documentId) {
+  return openAgencyRequestDocumentAtUrl(`/administration/messages-demandes-agence/${requestId}/documents/${documentId}/telecharger`);
+}
+
+export async function openAgencyRequestDocumentAtUrl(downloadUrl) {
   const previewWindow = window.open("", "_blank", "noopener,noreferrer");
-  const file = await apiDownload(`/administration/messages-demandes-agence/${requestId}/documents/${documentId}/telecharger`);
+  const file = downloadUrl.startsWith("http")
+    ? await apiDownloadUrl(downloadUrl)
+    : await apiDownload(downloadUrl);
 
   if (previewWindow) {
     previewWindow.location.href = file.url;
@@ -66,7 +72,13 @@ export async function openAgencyRequestDocument(requestId, documentId) {
 }
 
 export async function downloadAgencyRequestDocument(requestId, documentId) {
-  const file = await apiDownload(`/administration/messages-demandes-agence/${requestId}/documents/${documentId}/telecharger`);
+  return downloadAgencyRequestDocumentAtUrl(`/administration/messages-demandes-agence/${requestId}/documents/${documentId}/telecharger`);
+}
+
+export async function downloadAgencyRequestDocumentAtUrl(downloadUrl) {
+  const file = downloadUrl.startsWith("http")
+    ? await apiDownloadUrl(downloadUrl)
+    : await apiDownload(downloadUrl);
   const link = document.createElement("a");
   link.href = file.url;
   link.download = file.filename;

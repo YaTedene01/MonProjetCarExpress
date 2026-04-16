@@ -4,7 +4,7 @@ import { AgencyProfilePage } from "../components/VehicleDetail";
 import ChatPanel from "../components/ChatPanel";
 import { adaptAdminAgency, adaptAdminUser } from "../services/adapters";
 import { fetchAdminAgencies, fetchAdminDashboard, fetchAdminUsers } from "../services/catalogue";
-import { approveAgencyRequest, downloadAgencyRequestDocument, getAgencyRequests, loadAgencyRequestLogo, openAgencyRequestDocument } from "../services/agencyRequests";
+import { approveAgencyRequest, downloadAgencyRequestDocument, downloadAgencyRequestDocumentAtUrl, getAgencyRequests, loadAgencyRequestLogo, openAgencyRequestDocument, openAgencyRequestDocumentAtUrl } from "../services/agencyRequests";
 
 const S = {
   red: "#D40511",
@@ -198,23 +198,31 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
     }
   };
 
-  const handleOpenRequestDocument = async (requestId, documentId) => {
+  const handleOpenRequestDocument = async (requestId, documentId, downloadUrl) => {
     setRequestActionError("");
     setRequestActionSuccess("");
 
     try {
-      await openAgencyRequestDocument(requestId, documentId);
+      if (downloadUrl) {
+        await openAgencyRequestDocumentAtUrl(downloadUrl);
+      } else {
+        await openAgencyRequestDocument(requestId, documentId);
+      }
     } catch (error) {
       setRequestActionError(error?.message || "Impossible d'ouvrir ce document.");
     }
   };
 
-  const handleDownloadRequestDocument = async (requestId, documentId) => {
+  const handleDownloadRequestDocument = async (requestId, documentId, downloadUrl) => {
     setRequestActionError("");
     setRequestActionSuccess("");
 
     try {
-      await downloadAgencyRequestDocument(requestId, documentId);
+      if (downloadUrl) {
+        await downloadAgencyRequestDocumentAtUrl(downloadUrl);
+      } else {
+        await downloadAgencyRequestDocument(requestId, documentId);
+      }
     } catch (error) {
       setRequestActionError(error?.message || "Impossible de telecharger ce document.");
     }
@@ -514,8 +522,8 @@ function RegisterAgency({ pendingRequests, agencyRequestsLoading, agencyRequests
                           {document.mime_type} · {Math.max(1, Math.round((document.size || 0) / 1024))} Ko
                         </div>
                         <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button type="button" onClick={() => onOpenDocument?.(request.id, document.id)} style={ghostButtonStyle()}>Voir</button>
-                          <button type="button" onClick={() => onDownloadDocument?.(request.id, document.id)} style={ghostButtonStyle()}>Telecharger</button>
+                          <button type="button" onClick={() => onOpenDocument?.(request.id, document.id, document.download_url)} style={ghostButtonStyle()}>Voir</button>
+                          <button type="button" onClick={() => onDownloadDocument?.(request.id, document.id, document.download_url)} style={ghostButtonStyle()}>Telecharger</button>
                         </div>
                       </div>
                     )) : <div style={{ fontSize: 12, color: S.text3 }}>Aucun document joint.</div>}
@@ -590,21 +598,41 @@ function AgencyLogoPreview({ logoUrl, company }) {
   }, [logoUrl]);
 
   return (
-    <div style={{ width: 88, height: 88, borderRadius: 16, overflow: "hidden", border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.9)", display: "grid", placeItems: "center" }}>
+    <div style={{ display: "grid", gap: 10 }}>
+      <div style={{ width: 160, height: 160, borderRadius: 20, overflow: "hidden", border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.92)", display: "grid", placeItems: "center", boxShadow: "0 10px 24px rgba(24,21,18,0.06)" }}>
+        {!hasError && resolvedLogoUrl ? (
+          <img
+            src={resolvedLogoUrl}
+            alt={`Logo ${company}`}
+            onError={() => setHasError(true)}
+            style={{ width: "100%", height: "100%", objectFit: "contain", background: "#fff" }}
+          />
+        ) : !hasError ? (
+          <div style={{ fontSize: 12, color: S.text3 }}>Chargement...</div>
+        ) : (
+          <div style={{ padding: 10, textAlign: "center", fontSize: 12, fontWeight: 700, color: S.text3, lineHeight: 1.4 }}>
+            Logo indisponible
+          </div>
+        )}
+      </div>
       {!hasError && resolvedLogoUrl ? (
-        <img
-          src={resolvedLogoUrl}
-          alt={`Logo ${company}`}
-          onError={() => setHasError(true)}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-      ) : !hasError ? (
-        <div style={{ fontSize: 12, color: S.text3 }}>Chargement...</div>
-      ) : (
-        <div style={{ padding: 10, textAlign: "center", fontSize: 12, fontWeight: 700, color: S.text3, lineHeight: 1.4 }}>
-          Logo indisponible
+        <div>
+          <a
+            href={resolvedLogoUrl}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              ...ghostButtonStyle(),
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              textDecoration: "none",
+            }}
+          >
+            Voir le logo
+          </a>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
