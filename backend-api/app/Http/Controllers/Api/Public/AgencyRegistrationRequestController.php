@@ -7,6 +7,7 @@ use App\Http\Requests\Public\StoreAgencyRegistrationRequest;
 use App\Models\AgencyRegistrationRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -69,6 +70,8 @@ class AgencyRegistrationRequestController extends Controller
 
             $documents = [];
             $logoUrl = null;
+            $storedLogoPath = null;
+            $storedDocumentPaths = [];
 
             try {
                 $logo = $request->file('logo');
@@ -77,6 +80,12 @@ class AgencyRegistrationRequestController extends Controller
                     Str::uuid()->toString().'.'.$logo->getClientOriginalExtension(),
                     'public'
                 );
+
+                if (! is_string($logoPath) || $logoPath === '') {
+                    throw new \RuntimeException('Le logo n a pas pu etre enregistre.');
+                }
+
+                $storedLogoPath = $logoPath;
                 $logoUrl = '/storage/'.$logoPath;
 
                 foreach ($this->resolveDocumentFiles($request) as $file) {
@@ -86,6 +95,11 @@ class AgencyRegistrationRequestController extends Controller
                         'local'
                     );
 
+                    if (! is_string($storedPath) || $storedPath === '') {
+                        throw new \RuntimeException(sprintf('Le document %s n a pas pu etre enregistre.', $file->getClientOriginalName()));
+                    }
+
+                    $storedDocumentPaths[] = $storedPath;
                     $documents[] = [
                         'name' => $file->getClientOriginalName(),
                         'path' => $storedPath,
@@ -93,8 +107,24 @@ class AgencyRegistrationRequestController extends Controller
                         'size' => $file->getSize(),
                     ];
                 }
-            } catch (Throwable) {
-                // Keep request as pending even if files cannot be persisted.
+            } catch (Throwable $exception) {
+                if ($storedLogoPath !== null) {
+                    Storage::disk('public')->delete($storedLogoPath);
+                }
+
+                if ($storedDocumentPaths !== []) {
+                    Storage::disk('local')->delete($storedDocumentPaths);
+                }
+
+                $registrationRequest->delete();
+
+                Log::error('Impossible de stocker les fichiers de demande agence.', [
+                    'request_id' => $registrationRequest->id,
+                    'company' => $payload['company'] ?? null,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                throw $exception;
             }
 
             $updatePayload = [];
@@ -124,9 +154,13 @@ class AgencyRegistrationRequestController extends Controller
                 ],
                 201
             );
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            Log::error('Creation de demande agence impossible.', [
+                'error' => $exception->getMessage(),
+            ]);
+
             return $this->errorResponse(
-                'Impossible d envoyer la demande agence pour le moment. Veuillez reessayer.',
+                'Impossible d envoyer la demande agence pour le moment. Verifiez le logo et les documents puis reessayez.',
                 422
             );
         }

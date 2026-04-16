@@ -455,6 +455,30 @@ function getAdminAlertType(alert) {
   return "Notification";
 }
 
+function formatFileSize(size) {
+  const value = Number(size || 0);
+
+  if (value >= 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} Mo`;
+  }
+
+  return `${Math.max(1, Math.round(value / 1024))} Ko`;
+}
+
+function getDocumentLabel(document) {
+  const extension = (document?.extension || "").toUpperCase();
+
+  if (document?.mime_type === "application/pdf" || extension === "PDF") {
+    return "PDF";
+  }
+
+  if ((document?.mime_type || "").startsWith("image/")) {
+    return extension || "IMAGE";
+  }
+
+  return extension || "FICHIER";
+}
+
 function RegisterAgency({ pendingRequests, agencyRequestsLoading, agencyRequestsError, onRetryAgencyRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument, requestActionError, requestActionSuccess }) {
   return (
     <Panel title="Enregistrer une agence" subtitle="Demandes en attente">
@@ -507,22 +531,34 @@ function RegisterAgency({ pendingRequests, agencyRequestsLoading, agencyRequests
                   {request.logo_url ? (
                     <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: S.text2 }}>Logo fourni</div>
-                      <AgencyLogoPreview logoUrl={request.logo_url} company={request.company} />
+                      <AgencyLogoPreview
+                        logoUrl={request.logo_url}
+                        company={request.company}
+                        onOpen={() => onOpenDocument?.(request.id, "logo", request.logo_url)}
+                        onDownload={() => onDownloadDocument?.(request.id, "logo", request.logo_download_url || request.logo_url)}
+                      />
                     </div>
                   ) : null}
 
                   <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: S.text2 }}>
-                      Documents fournis ({request.documents?.length || 0})
+                      Documents fournis ({request.documents_count || request.documents?.length || 0})
                     </div>
                     {request.documents?.length ? request.documents.map((document) => (
                       <div key={`${request.id}-${document.id}`} style={{ padding: "10px 12px", borderRadius: 12, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.84)" }}>
-                        <div style={{ fontWeight: 600, color: S.text }}>{document.name}</div>
-                        <div style={{ marginTop: 4, fontSize: 12, color: S.text3 }}>
-                          {document.mime_type} · {Math.max(1, Math.round((document.size || 0) / 1024))} Ko
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+                          <div>
+                            <div style={{ fontWeight: 600, color: S.text, wordBreak: "break-word" }}>{document.name}</div>
+                            <div style={{ marginTop: 4, fontSize: 12, color: S.text3 }}>
+                              {document.mime_type} · {formatFileSize(document.size)}
+                            </div>
+                          </div>
+                          <Chip tone={document.is_previewable ? "blue" : "dark"}>{getDocumentLabel(document)}</Chip>
                         </div>
                         <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button type="button" onClick={() => onOpenDocument?.(request.id, document.id, document.download_url)} style={ghostButtonStyle()}>Voir</button>
+                          <button type="button" onClick={() => onOpenDocument?.(request.id, document.id, document.preview_url || document.download_url)} style={ghostButtonStyle()}>
+                            {document.is_previewable ? "Voir" : "Ouvrir"}
+                          </button>
                           <button type="button" onClick={() => onDownloadDocument?.(request.id, document.id, document.download_url)} style={ghostButtonStyle()}>Telecharger</button>
                         </div>
                       </div>
@@ -557,7 +593,7 @@ function RegisterAgency({ pendingRequests, agencyRequestsLoading, agencyRequests
   );
 }
 
-function AgencyLogoPreview({ logoUrl, company }) {
+function AgencyLogoPreview({ logoUrl, company, onOpen, onDownload }) {
   const [hasError, setHasError] = useState(false);
   const [resolvedLogoUrl, setResolvedLogoUrl] = useState("");
 
@@ -616,21 +652,13 @@ function AgencyLogoPreview({ logoUrl, company }) {
         )}
       </div>
       {!hasError && resolvedLogoUrl ? (
-        <div>
-          <a
-            href={resolvedLogoUrl}
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              ...ghostButtonStyle(),
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              textDecoration: "none",
-            }}
-          >
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" onClick={onOpen} style={ghostButtonStyle()}>
             Voir le logo
-          </a>
+          </button>
+          <button type="button" onClick={onDownload} style={ghostButtonStyle()}>
+            Telecharger le logo
+          </button>
         </div>
       ) : null}
     </div>
