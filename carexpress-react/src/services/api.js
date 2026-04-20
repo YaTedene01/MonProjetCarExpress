@@ -232,7 +232,7 @@ export async function apiDownload(path) {
   }
 
   if (!response.ok) {
-    throw new Error("Impossible de recuperer le fichier.");
+    throw await buildDownloadError(response, "Impossible de recuperer le fichier.");
   }
 
   const blob = await response.blob();
@@ -265,7 +265,7 @@ export async function apiDownloadUrl(url) {
   }
 
   if (!response.ok) {
-    throw new Error("Impossible de recuperer le fichier.");
+    throw await buildDownloadError(response, "Impossible de recuperer le fichier.");
   }
 
   const blob = await response.blob();
@@ -294,4 +294,20 @@ function resolveFilenameFromHeaders(headers) {
   const asciiMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
 
   return asciiMatch?.[1] || "document";
+}
+
+async function buildDownloadError(response, fallbackMessage) {
+  let payload = null;
+
+  try {
+    payload = await response.clone().json();
+  } catch {
+    payload = null;
+  }
+
+  const error = new Error(payload?.message || fallbackMessage);
+  error.status = response.status;
+  error.payload = payload;
+
+  return error;
 }
