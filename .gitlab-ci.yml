@@ -1,0 +1,57 @@
+stages:
+  - backend
+  - frontend
+  - deploy
+
+variables:
+  POSTGRES_DB: carexpress
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  DB_HOST: postgres
+  DB_PORT: 5432
+  DB_DATABASE: carexpress
+  DB_USERNAME: postgres
+  DB_PASSWORD: postgres
+
+build-backend:
+  stage: backend
+  image: php:8.3
+  services:
+    - name: postgres:16
+      alias: postgres
+  before_script:
+    - apt-get update
+    - apt-get install -y unzip git libzip-dev libpq-dev
+    - docker-php-ext-install pdo pdo_pgsql
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+  script:
+    - cd backend-api
+    - composer install --no-interaction --prefer-dist
+    - cp .env.example .env
+    - |
+      php -r "file_put_contents('.env', str_replace(
+        ['DB_HOST=127.0.0.1','DB_DATABASE=laravel','DB_USERNAME=root','DB_PASSWORD='],
+        ['DB_HOST=postgres','DB_DATABASE=carexpress','DB_USERNAME=postgres','DB_PASSWORD=postgres'],
+        file_get_contents('.env')));"
+    - php artisan key:generate
+    - php artisan migrate --force
+    - php artisan test
+
+build-frontend:
+  stage: frontend
+  image: node:20
+  script:
+    - cd carexpress-react
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - carexpress-react/dist
+
+deploy:
+  stage: deploy
+  image: alpine:3.18
+  script:
+    - echo "Déploiement : configure ton job deploy ici"
+  only:
+    - main

@@ -23,8 +23,14 @@ class AgencyRegistrationRequestResource extends JsonResource
                 'size' => $document['size'] ?? 0,
                 'extension' => $extension !== '' ? strtolower($extension) : null,
                 'is_previewable' => $isPreviewable,
-                'download_url' => "/administration/messages-demandes-agence/{$requestId}/documents/{$index}/telecharger",
-                'preview_url' => "/administration/messages-demandes-agence/{$requestId}/documents/{$index}/telecharger",
+                'download_url' => route('agency-registration-requests.documents.download', [
+                    'agencyRegistrationRequest' => $requestId,
+                    'documentIndex' => $index,
+                ], false),
+                'preview_url' => route('agency-registration-requests.documents.download', [
+                    'agencyRegistrationRequest' => $requestId,
+                    'documentIndex' => $index,
+                ], false),
             ];
         })->values()->all();
         $logoUrl = $this->resolveLogoUrl();
@@ -59,6 +65,8 @@ class AgencyRegistrationRequestResource extends JsonResource
             return null;
         }
 
-        return "/administration/messages-demandes-agence/{$this->id}/logo";
+        return route('agency-registration-requests.logo', [
+            'agencyRegistrationRequest' => $this->id,
+        ], false);
     }
 }

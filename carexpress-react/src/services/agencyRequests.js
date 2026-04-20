@@ -1,5 +1,9 @@
 import { apiDownload, apiDownloadUrl, apiRequest } from "./api";
 
+function isDirectUrl(url) {
+  return typeof url === "string" && (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/api/"));
+}
+
 export async function createAgencyRequest(formData) {
   const payload = new FormData();
 
@@ -48,6 +52,14 @@ export async function approveAgencyRequest(requestId) {
   return response.data;
 }
 
+export async function createAgency(data) {
+  const response = await apiRequest("/administration/agences", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return response.data;
+}
+
 export async function markAgencyRequestAsRead(requestId) {
   return getAgencyRequest(requestId);
 }
@@ -60,7 +72,7 @@ export async function openAgencyRequestDocumentAtUrl(downloadUrl) {
   const previewWindow = window.open("", "_blank", "noopener,noreferrer");
 
   try {
-    const file = downloadUrl.startsWith("http")
+    const file = isDirectUrl(downloadUrl)
       ? await apiDownloadUrl(downloadUrl)
       : await apiDownload(downloadUrl);
     const url = file.url;
@@ -86,7 +98,7 @@ export async function downloadAgencyRequestDocument(requestId, documentId) {
 }
 
 export async function downloadAgencyRequestDocumentAtUrl(downloadUrl) {
-  const file = downloadUrl.startsWith("http")
+  const file = isDirectUrl(downloadUrl)
     ? await apiDownloadUrl(downloadUrl)
     : await apiDownload(downloadUrl);
   const link = document.createElement("a");
@@ -104,5 +116,5 @@ export async function loadAgencyRequestLogo(logoUrl) {
     throw new Error("Logo URL manquante.");
   }
 
-  return logoUrl.startsWith("http") ? apiDownloadUrl(logoUrl) : apiDownload(logoUrl);
+  return isDirectUrl(logoUrl) ? apiDownloadUrl(logoUrl) : apiDownload(logoUrl);
 }

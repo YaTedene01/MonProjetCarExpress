@@ -9,6 +9,7 @@ use App\Models\Vehicle;
 use App\Repository\ReservationRepository;
 use App\Services\ReservationService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
 class ReservationController extends Controller
@@ -39,12 +40,12 @@ class ReservationController extends Controller
             new OA\Response(response: 500, description: 'Erreur serveur', content: new OA\JsonContent(ref: '#/components/schemas/ServerErrorResponse'))
         ]
     )]
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         return $this->successResponse(
             'Reservations recuperees avec succes.',
             ReservationResource::collection(
-                $this->reservations->getClientReservations(auth()->id())
+                $this->reservations->getClientReservations($request->user()->id)
             )
         );
     }
@@ -100,7 +101,7 @@ class ReservationController extends Controller
         );
 
         return $this->successResponse(
-            'Réservation créée avec succès.',
+            'Reservation creee avec succes.',
             new ReservationResource($reservation),
             201
         );

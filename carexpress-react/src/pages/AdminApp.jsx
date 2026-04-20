@@ -4,7 +4,7 @@ import { AgencyProfilePage } from "../components/VehicleDetail";
 import ChatPanel from "../components/ChatPanel";
 import { adaptAdminAgency, adaptAdminUser } from "../services/adapters";
 import { fetchAdminAgencies, fetchAdminDashboard, fetchAdminUsers } from "../services/catalogue";
-import { approveAgencyRequest, downloadAgencyRequestDocument, downloadAgencyRequestDocumentAtUrl, getAgencyRequests, loadAgencyRequestLogo, openAgencyRequestDocument, openAgencyRequestDocumentAtUrl } from "../services/agencyRequests";
+import { approveAgencyRequest, createAgency, downloadAgencyRequestDocument, downloadAgencyRequestDocumentAtUrl, getAgencyRequests, loadAgencyRequestLogo, openAgencyRequestDocument, openAgencyRequestDocumentAtUrl } from "../services/agencyRequests";
 
 const S = {
   red: "#D40511",
@@ -479,10 +479,160 @@ function getDocumentLabel(document) {
   return extension || "FICHIER";
 }
 
-function RegisterAgency({ pendingRequests, agencyRequestsLoading, agencyRequestsError, onRetryAgencyRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument, requestActionError, requestActionSuccess }) {
+function RegisterAgency({ onAgencyCreated, pendingRequests, agencyRequestsLoading, agencyRequestsError, onRetryAgencyRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument, requestActionError, requestActionSuccess }) {
+  const initialForm = {
+    name: "",
+    activity: "Location et vente",
+    city: "",
+    district: "",
+    address: "",
+    contact_phone: "",
+    contact_email: "",
+    ninea: "",
+    color: "#D40511",
+    manager_name: "",
+    manager_email: "",
+    manager_phone: "",
+    manager_password: "",
+  };
+  const [form, setForm] = useState(initialForm);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [manualSuccess, setManualSuccess] = useState("");
+  const [manualError, setManualError] = useState("");
+  const [manualFieldErrors, setManualFieldErrors] = useState({});
+
+  const updateForm = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setManualFieldErrors((current) => {
+      if (!current[field]) {
+        return current;
+      }
+
+      const nextErrors = { ...current };
+      delete nextErrors[field];
+      return nextErrors;
+    });
+  };
+
+  const handleManualCreateAgency = async (event) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    setManualSuccess("");
+    setManualError("");
+    setManualFieldErrors({});
+
+    try {
+      const agency = await createAgency(form);
+      onAgencyCreated?.(agency);
+      setManualSuccess("L'agence a ete enregistree avec succes.");
+      setForm(initialForm);
+    } catch (error) {
+      setManualError(error?.message || "Impossible d'enregistrer l'agence pour le moment.");
+      setManualFieldErrors(error?.fieldErrors || {});
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getFieldError = (field) => manualFieldErrors?.[field]?.[0] || "";
+
   return (
     <Panel title="Enregistrer une agence" subtitle="Demandes en attente">
       <div style={{ display: "grid", gap: 14 }}>
+        <SectionCard title="Creation manuelle">
+          <form onSubmit={handleManualCreateAgency} style={{ display: "grid", gap: 14 }}>
+            {manualError ? (
+              <div style={{ padding: "12px 14px", borderRadius: 14, border: "1px solid rgba(212,5,17,0.22)", background: "rgba(212,5,17,0.08)", color: S.red, fontSize: 13, lineHeight: 1.6 }}>
+                {manualError}
+              </div>
+            ) : null}
+            {manualSuccess ? (
+              <div style={{ padding: "12px 14px", borderRadius: 14, border: "1px solid rgba(26,122,46,0.22)", background: "rgba(26,122,46,0.1)", color: S.success, fontSize: 13, lineHeight: 1.6 }}>
+                {manualSuccess}
+              </div>
+            ) : null}
+
+            <div style={autoGrid(220, 14)}>
+              <FormField label="Nom agence">
+                <Input placeholder="Dakar Auto Services" value={form.name} onChange={(e) => updateForm("name", e.target.value)} />
+                {getFieldError("name") ? <FieldError message={getFieldError("name")} /> : null}
+              </FormField>
+              <FormField label="Activite">
+                <Select value={form.activity} onChange={(e) => updateForm("activity", e.target.value)}>
+                  <option value="Location et vente">Location et vente</option>
+                  <option value="Location">Location</option>
+                  <option value="Vente">Vente</option>
+                </Select>
+                {getFieldError("activity") ? <FieldError message={getFieldError("activity")} /> : null}
+              </FormField>
+              <FormField label="Ville">
+                <Input placeholder="Dakar" value={form.city} onChange={(e) => updateForm("city", e.target.value)} />
+                {getFieldError("city") ? <FieldError message={getFieldError("city")} /> : null}
+              </FormField>
+              <FormField label="Quartier">
+                <Input placeholder="Plateau" value={form.district} onChange={(e) => updateForm("district", e.target.value)} />
+                {getFieldError("district") ? <FieldError message={getFieldError("district")} /> : null}
+              </FormField>
+              <FormField label="Adresse">
+                <Input placeholder="Rue 10 x Avenue 12" value={form.address} onChange={(e) => updateForm("address", e.target.value)} />
+                {getFieldError("address") ? <FieldError message={getFieldError("address")} /> : null}
+              </FormField>
+              <FormField label="Telephone agence">
+                <Input placeholder="+221771234567" value={form.contact_phone} onChange={(e) => updateForm("contact_phone", e.target.value)} />
+                {getFieldError("contact_phone") ? <FieldError message={getFieldError("contact_phone")} /> : null}
+              </FormField>
+              <FormField label="Email agence">
+                <Input type="email" placeholder="contact@agence.sn" value={form.contact_email} onChange={(e) => updateForm("contact_email", e.target.value)} />
+                {getFieldError("contact_email") ? <FieldError message={getFieldError("contact_email")} /> : null}
+              </FormField>
+              <FormField label="NINEA">
+                <Input placeholder="SN-2026-00123" value={form.ninea} onChange={(e) => updateForm("ninea", e.target.value)} />
+                {getFieldError("ninea") ? <FieldError message={getFieldError("ninea")} /> : null}
+              </FormField>
+              <FormField label="Couleur">
+                <Input placeholder="#D40511" value={form.color} onChange={(e) => updateForm("color", e.target.value)} />
+                {getFieldError("color") ? <FieldError message={getFieldError("color")} /> : null}
+              </FormField>
+            </div>
+
+            <div style={autoGrid(220, 14)}>
+              <FormField label="Responsable agence">
+                <Input placeholder="Amadou Fall" value={form.manager_name} onChange={(e) => updateForm("manager_name", e.target.value)} />
+                {getFieldError("manager_name") ? <FieldError message={getFieldError("manager_name")} /> : null}
+              </FormField>
+              <FormField label="Email responsable">
+                <Input type="email" placeholder="manager@agence.sn" value={form.manager_email} onChange={(e) => updateForm("manager_email", e.target.value)} />
+                {getFieldError("manager_email") ? <FieldError message={getFieldError("manager_email")} /> : null}
+              </FormField>
+              <FormField label="Telephone responsable">
+                <Input placeholder="+221778887766" value={form.manager_phone} onChange={(e) => updateForm("manager_phone", e.target.value)} />
+                {getFieldError("manager_phone") ? <FieldError message={getFieldError("manager_phone")} /> : null}
+              </FormField>
+              <FormField label="Mot de passe provisoire">
+                <Input type="password" placeholder="agency12345" value={form.manager_password} onChange={(e) => updateForm("manager_password", e.target.value)} />
+                {getFieldError("manager_password") ? <FieldError message={getFieldError("manager_password")} /> : null}
+              </FormField>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                style={{
+                  ...ghostButtonStyle(),
+                  minWidth: 220,
+                  borderColor: S.success,
+                  color: S.success,
+                  opacity: isSubmitting ? 0.7 : 1,
+                  cursor: isSubmitting ? "wait" : "pointer",
+                }}
+              >
+                {isSubmitting ? "Enregistrement..." : "Enregistrer l'agence"}
+              </button>
+            </div>
+          </form>
+        </SectionCard>
+
         <SectionCard title="Demandes en attente">
           {requestActionError ? (
             <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 14, border: "1px solid rgba(212,5,17,0.22)", background: "rgba(212,5,17,0.08)", color: S.red, fontSize: 13, lineHeight: 1.6 }}>
@@ -590,6 +740,14 @@ function RegisterAgency({ pendingRequests, agencyRequestsLoading, agencyRequests
         </SectionCard>
       </div>
     </Panel>
+  );
+}
+
+function FieldError({ message }) {
+  return (
+    <div style={{ marginTop: 6, fontSize: 12, color: S.red, lineHeight: 1.5 }}>
+      {message}
+    </div>
   );
 }
 

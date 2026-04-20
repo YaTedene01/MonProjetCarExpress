@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: carexpress
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v4
+        with:
+          php-version: 8.3
+      - name: Install composer dependencies
+        run: |
+          cd backend-api
+          composer install --no-interaction --prefer-dist
+      - name: Prepare env
+        run: |
+          cd backend-api
+          cp .env.example .env
+          php -r "file_put_contents('.env', str_replace('DB_DATABASE=laravel', 'DB_DATABASE=carexpress', file_get_contents('.env')));"
+          php -r "file_put_contents('.env', str_replace('DB_USERNAME=root', 'DB_USERNAME=postgres', file_get_contents('.env')));"
+          php -r "file_put_contents('.env', str_replace('DB_PASSWORD=', 'DB_PASSWORD=postgres', file_get_contents('.env')));"
+      - name: Run migrations and tests
+        run: |
+          cd backend-api
+          php artisan key:generate
+          php artisan migrate --force
+          php artisan test
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install frontend
+        run: |
+          cd carexpress-react
+          npm ci
+      - name: Build frontend
+        run: |
+          cd carexpress-react
+          npm run build

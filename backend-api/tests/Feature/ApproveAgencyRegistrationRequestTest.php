@@ -91,4 +91,46 @@ class ApproveAgencyRegistrationRequestTest extends TestCase
             'status' => 'approved',
         ]);
     }
+
+    public function test_admin_listing_returns_api_urls_for_logo_and_documents(): void
+    {
+        $admin = User::query()->create([
+            'role' => 'admin',
+            'name' => 'Admin Test',
+            'email' => 'admin.urls@carexpress.sn',
+            'phone' => '+221770000010',
+            'city' => 'Dakar',
+            'password' => 'admin12345',
+            'status' => 'active',
+        ]);
+
+        $request = AgencyRegistrationRequest::query()->create([
+            'company' => 'Sahel Cars',
+            'email' => 'contact@sahel-cars.sn',
+            'phone' => '+221771112233',
+            'city' => 'Dakar',
+            'activity' => 'Location',
+            'manager_name' => 'Awa Ndiaye',
+            'ninea' => 'SN-2026-00999',
+            'color' => '#D40511',
+            'logo_url' => '/storage/agency-registration-requests/12/logo/logo.png',
+            'password' => 'agency12345',
+            'status' => 'pending',
+            'documents' => [[
+                'name' => 'registre.pdf',
+                'path' => 'agency-registration-requests/12/registre.pdf',
+                'mime_type' => 'application/pdf',
+                'size' => 123456,
+            ]],
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/v1/administration/messages-demandes-agence')
+            ->assertOk()
+            ->assertJsonPath('data.0.logo_url', "/api/v1/administration/messages-demandes-agence/{$request->id}/logo")
+            ->assertJsonPath('data.0.logo_download_url', "/api/v1/administration/messages-demandes-agence/{$request->id}/logo")
+            ->assertJsonPath('data.0.documents.0.download_url', "/api/v1/administration/messages-demandes-agence/{$request->id}/documents/0/telecharger")
+            ->assertJsonPath('data.0.documents.0.preview_url', "/api/v1/administration/messages-demandes-agence/{$request->id}/documents/0/telecharger");
+    }
 }
