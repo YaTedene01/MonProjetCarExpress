@@ -10,11 +10,14 @@ use App\Models\AgencyRegistrationRequest;
 use App\Repository\AgencyRepository;
 use App\Repository\UserRepository;
 use App\Utils\GenererReference;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class AgencyRegistrationRequestController extends Controller
 {
@@ -54,30 +57,25 @@ class AgencyRegistrationRequestController extends Controller
         $document = $agencyRegistrationRequest->documents[$documentIndex] ?? null;
 
         abort_unless(is_array($document) && isset($document['path']), 404, 'Document introuvable.');
+        [$disk, $path] = $this->resolveStoredFile((string) $document['path'], ['local', 'public']);
 
-        abort_unless(Storage::disk('local')->exists($document['path']), 404, 'Fichier introuvable.');
+        abort_unless($disk !== null && $path !== null, 404, 'Fichier introuvable.');
 
-        return Storage::disk('local')->response(
-            $document['path'],
-            $document['name'] ?? basename($document['path'])
-        );
+        return Storage::disk($disk)->response($path, $document['name'] ?? basename($path));
     }
 
     public function showLogo(AgencyRegistrationRequest $agencyRegistrationRequest)
     {
-        $logoPath = $this->extractPublicStoragePath($agencyRegistrationRequest->logo_url);
+        [$disk, $logoPath] = $this->resolveStoredFile((string) $agencyRegistrationRequest->logo_url, ['public', 'local']);
 
-        abort_unless($logoPath !== null, 404, 'Logo introuvable.');
-        abort_unless(Storage::disk('public')->exists($logoPath), 404, 'Logo introuvable.');
+        abort_unless($disk !== null && $logoPath !== null, 404, 'Logo introuvable.');
 
-        return Storage::disk('public')->response($logoPath);
+        return Storage::disk($disk)->response($logoPath);
     }
 
     public function approve(AgencyRegistrationRequest $agencyRegistrationRequest): JsonResponse
     {
-        $existingAgencyFromRequest = Agency::query()
-            ->where('metadata->registration_request_id', $agencyRegistrationRequest->id)
-            ->first();
+        $existingAgencyFromRequest = $this->findExistingAgencyFromRequest($agencyRegistrationRequest);
 
         if ($existingAgencyFromRequest !== null) {
             if ($agencyRegistrationRequest->status !== 'approved') {
@@ -113,13 +111,15 @@ class AgencyRegistrationRequestController extends Controller
             ]);
         }
 
-        if ($agencyRegistrationRequest->email !== null && $this->users->findByEmail($agencyRegistrationRequest->email) !== null) {
+        $userColumns = $this->getTableColumns('users');
+
+        if (isset($userColumns['email']) && $agencyRegistrationRequest->email !== null && $this->users->findByEmail($agencyRegistrationRequest->email) !== null) {
             throw ValidationException::withMessages([
                 'email' => ['Cette adresse email est deja utilisee par un compte existant.'],
             ]);
         }
 
-        if ($agencyRegistrationRequest->phone !== null && $this->users->findByPhone($agencyRegistrationRequest->phone) !== null) {
+        if (isset($userColumns['phone']) && $agencyRegistrationRequest->phone !== null && $this->users->findByPhone($agencyRegistrationRequest->phone) !== null) {
             throw ValidationException::withMessages([
                 'phone' => ['Ce numero de telephone est deja utilise par un compte existant.'],
             ]);
@@ -129,7 +129,7 @@ class AgencyRegistrationRequestController extends Controller
             DB::transaction(function () use ($agencyRegistrationRequest): void {
                 [$contactFirstName, $contactLastName] = $this->splitManagerName($agencyRegistrationRequest->manager_name);
 
-                $agency = $this->agencies->create([
+                $agency = $this->agencies->create($this->filterColumns('agencies', [
                     'name' => $agencyRegistrationRequest->company,
                     'slug' => GenererReference::slug($agencyRegistrationRequest->company),
                     'activity' => $agencyRegistrationRequest->activity ?: 'Location et vente',
@@ -163,9 +163,9 @@ class AgencyRegistrationRequestController extends Controller
                             'documents' => $agencyRegistrationRequest->documents,
                         ],
                     ],
-                ]);
+                ]));
 
-                $this->users->create([
+                $this->users->create($this->filterColumns('users', [
                     'agency_id' => $agency->id,
                     'role' => UserRole::Agency,
                     'name' => $agencyRegistrationRequest->manager_name ?: $agencyRegistrationRequest->company,
@@ -174,7 +174,7 @@ class AgencyRegistrationRequestController extends Controller
                     'city' => $agencyRegistrationRequest->city,
                     'password' => $agencyRegistrationRequest->password,
                     'status' => 'active',
-                ]);
+                ]));
 
                 $agencyRegistrationRequest->forceFill([
                     'status' => 'approved',
@@ -190,6 +190,16 @@ class AgencyRegistrationRequestController extends Controller
                     'request' => ['Une agence ou un utilisateur existe deja avec ces informations.'],
                 ]);
             }
+
+            throw $exception;
+        } catch (Throwable $exception) {
+            Log::error('Echec de l enregistrement d une demande agence.', [
+                'request_id' => $agencyRegistrationRequest->id,
+                'company' => $agencyRegistrationRequest->company,
+                'email' => $agencyRegistrationRequest->email,
+                'phone' => $agencyRegistrationRequest->phone,
+                'error' => $exception->getMessage(),
+            ]);
 
             throw $exception;
         }
@@ -231,5 +241,83 @@ class AgencyRegistrationRequestController extends Controller
         }
 
         return ltrim(substr($normalizedPath, strlen('/storage/')), '/');
+    }
+
+    private function resolveStoredFile(string $value, array $preferredDisks): array
+    {
+        $path = trim($value);
+
+        if ($path === '') {
+            return [null, null];
+        }
+
+        $publicPath = $this->extractPublicStoragePath($path);
+        $candidatePaths = array_values(array_unique(array_filter([
+            $publicPath,
+            ltrim($path, '/'),
+        ])));
+
+        foreach ($preferredDisks as $disk) {
+            foreach ($candidatePaths as $candidatePath) {
+                if (Storage::disk($disk)->exists($candidatePath)) {
+                    return [$disk, $candidatePath];
+                }
+            }
+        }
+
+        return [null, null];
+    }
+
+    private function findExistingAgencyFromRequest(AgencyRegistrationRequest $agencyRegistrationRequest): ?Agency
+    {
+        $agencyColumns = $this->getTableColumns('agencies');
+
+        if (isset($agencyColumns['metadata'])) {
+            $agency = Agency::query()
+                ->where('metadata->registration_request_id', $agencyRegistrationRequest->id)
+                ->first();
+
+            if ($agency !== null) {
+                return $agency;
+            }
+        }
+
+        $query = Agency::query();
+
+        if (isset($agencyColumns['contact_email']) && $agencyRegistrationRequest->email) {
+            $query->where('contact_email', $agencyRegistrationRequest->email);
+        } elseif (isset($agencyColumns['contact_phone']) && $agencyRegistrationRequest->phone) {
+            $query->where('contact_phone', $agencyRegistrationRequest->phone);
+        } elseif (isset($agencyColumns['name'])) {
+            $query->where('name', $agencyRegistrationRequest->company);
+        } else {
+            return null;
+        }
+
+        return $query->first();
+    }
+
+    private function filterColumns(string $table, array $payload): array
+    {
+        $columns = $this->getTableColumns($table);
+
+        return array_filter(
+            $payload,
+            static fn (string $key): bool => isset($columns[$key]),
+            ARRAY_FILTER_USE_KEY
+        );
+    }
+
+    private function getTableColumns(string $table): array
+    {
+        static $cache = [];
+
+        if (! array_key_exists($table, $cache)) {
+            $cache[$table] = Schema::hasTable($table)
+                ? array_flip(Schema::getColumnListing($table))
+                : [];
+        }
+
+        return $cache[$table];
     }
 }
