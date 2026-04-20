@@ -54,10 +54,17 @@ function buildApiCandidates() {
 async function fetchWithApiFallback(path, options) {
   const candidates = buildApiCandidates();
   let lastNetworkError = null;
+  let lastResponse = null;
 
   for (const baseUrl of candidates) {
     try {
       const response = await fetch(`${baseUrl}${API_PREFIX}${path}`, options);
+
+      if (response.ok && isUnexpectedHtmlResponse(`${API_PREFIX}${path}`, response)) {
+        lastResponse = response;
+        continue;
+      }
+
       workingApiBaseUrl = baseUrl;
       return response;
     } catch (error) {
@@ -66,6 +73,10 @@ async function fetchWithApiFallback(path, options) {
       }
       lastNetworkError = error;
     }
+  }
+
+  if (lastResponse) {
+    return lastResponse;
   }
 
   throw lastNetworkError || new Error("Connexion API impossible.");
@@ -178,6 +189,14 @@ export async function apiRequest(path, options = {}) {
     payload = await response.json();
   } catch {
     payload = null;
+  }
+
+  if (response.ok && payload === null) {
+    const error = new Error("Le serveur a renvoye une reponse invalide. Verifiez que l API backend repond bien en JSON.");
+    error.status = response.status;
+    error.payload = null;
+    error.fieldErrors = {};
+    throw error;
   }
 
   if (!response.ok) {
