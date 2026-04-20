@@ -24,7 +24,7 @@ export async function createAgencyRequest(formData) {
   payload.append("password_confirmation", formData.confirmPassword || "");
 
   (formData.documents || []).forEach((file) => {
-    payload.append("documents", file);
+    payload.append("documents[]", file);
   });
 
   const response = await apiRequest("/demandes-enregistrement-agence", {
