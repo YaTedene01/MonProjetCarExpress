@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AgencyRegistrationRequestResource;
+use App\Models\Agency;
 use App\Models\AgencyRegistrationRequest;
 use App\Repository\AgencyRepository;
 use App\Repository\UserRepository;
@@ -74,10 +75,30 @@ class AgencyRegistrationRequestController extends Controller
 
     public function approve(AgencyRegistrationRequest $agencyRegistrationRequest): JsonResponse
     {
+        $existingAgencyFromRequest = Agency::query()
+            ->where('metadata->registration_request_id', $agencyRegistrationRequest->id)
+            ->first();
+
+        if ($existingAgencyFromRequest !== null) {
+            if ($agencyRegistrationRequest->status !== 'approved') {
+                $agencyRegistrationRequest->forceFill([
+                    'status' => 'approved',
+                    'reviewed_at' => $agencyRegistrationRequest->reviewed_at ?? now(),
+                    'read_at' => $agencyRegistrationRequest->read_at ?? now(),
+                ])->save();
+            }
+
+            return $this->successResponse(
+                'Demande agence enregistree avec succes.',
+                new AgencyRegistrationRequestResource($agencyRegistrationRequest->fresh())
+            );
+        }
+
         if ($agencyRegistrationRequest->status === 'approved') {
-            throw ValidationException::withMessages([
-                'request' => ['Cette demande a deja ete enregistree.'],
-            ]);
+            return $this->successResponse(
+                'Demande agence enregistree avec succes.',
+                new AgencyRegistrationRequestResource($agencyRegistrationRequest->fresh())
+            );
         }
 
         if ($agencyRegistrationRequest->status !== 'pending') {
@@ -164,7 +185,7 @@ class AgencyRegistrationRequestController extends Controller
         } catch (QueryException $exception) {
             $sqlState = (string) ($exception->errorInfo[0] ?? '');
 
-            if ($sqlState === '23505') {
+            if (in_array($sqlState, ['23000', '23505'], true)) {
                 throw ValidationException::withMessages([
                     'request' => ['Une agence ou un utilisateur existe deja avec ces informations.'],
                 ]);

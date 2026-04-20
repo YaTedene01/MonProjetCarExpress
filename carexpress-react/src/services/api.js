@@ -71,6 +71,41 @@ async function fetchWithApiFallback(path, options) {
   throw lastNetworkError || new Error("Connexion API impossible.");
 }
 
+async function fetchAbsoluteWithApiFallback(url, options) {
+  if (/^https?:\/\//i.test(url)) {
+    return fetch(url, options);
+  }
+
+  const candidates = buildApiCandidates();
+  let lastNetworkError = null;
+  let lastResponse = null;
+
+  for (const baseUrl of candidates) {
+    try {
+      const response = await fetch(`${baseUrl}${url}`, options);
+
+      if (response.ok) {
+        workingApiBaseUrl = baseUrl;
+        return response;
+      }
+
+      lastResponse = response;
+    } catch (error) {
+      if (!isLikelyNetworkError(error)) {
+        throw error;
+      }
+
+      lastNetworkError = error;
+    }
+  }
+
+  if (lastResponse) {
+    return lastResponse;
+  }
+
+  throw lastNetworkError || new Error("Connexion API impossible.");
+}
+
 export function getApiBaseUrl() {
   return workingApiBaseUrl ?? API_BASE_URL;
 }
@@ -188,7 +223,7 @@ export async function apiDownloadUrl(url) {
 
   let response;
   try {
-    response = await fetch(url, {
+    response = await fetchAbsoluteWithApiFallback(url, {
       method: "GET",
       headers,
     });
