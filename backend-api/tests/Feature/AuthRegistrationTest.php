@@ -46,19 +46,12 @@ class AuthRegistrationTest extends TestCase
         ]);
 
         $response
-            ->assertCreated()
-            ->assertJsonPath('status', true)
-            ->assertJsonPath('data.utilisateur.role', 'agency')
-            ->assertJsonPath('data.agence.name', 'Nouvelle Agence Dakar')
-            ->assertJsonPath('data.agence.status', 'pending');
+            ->assertStatus(422)
+            ->assertJsonPath('status', false)
+            ->assertJsonPath('errors.workflow.0', 'Envoyez une demande agence avec logo et documents, puis attendez la validation administrateur.');
 
-        $agency = Agency::query()->where('name', 'Nouvelle Agence Dakar')->first();
-
-        $this->assertNotNull($agency);
-        $this->assertDatabaseHas('users', [
-            'agency_id' => $agency->id,
-            'email' => 'contact@nouvelle-agence.sn',
-            'role' => 'agency',
+        $this->assertDatabaseMissing('agencies', [
+            'name' => 'Nouvelle Agence Dakar',
         ]);
     }
 

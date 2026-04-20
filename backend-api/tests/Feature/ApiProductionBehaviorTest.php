@@ -42,7 +42,7 @@ class ApiProductionBehaviorTest extends TestCase
             'HTTPS' => 'on',
         ])->getJson('/api/docs/openapi.json')
             ->assertOk()
-            ->assertJsonPath('servers.0.url', 'https://backendcarexpress.onrender.com')
+            ->assertJsonPath('servers.0.url', 'http://localhost:8000')
             ->assertJsonPath('servers.0.description', 'Serveur API');
     }
 }

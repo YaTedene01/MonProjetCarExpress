@@ -80,14 +80,14 @@ class DemandeAchatService
                 $vehicleName,
                 $serviceFeeAmount
             ),
-            'context' => [
+            'context' => json_encode([
                 'type' => 'purchase_request_created',
                 'purchase_request_id' => $purchaseRequest->id,
                 'vehicle_id' => $vehicle->id,
                 'agency_id' => $vehicle->agency_id,
                 'client_id' => $clientId,
                 'service_fee' => (float) $serviceFee,
-            ],
+            ]),
             'is_read' => false,
             'created_at' => $now,
             'updated_at' => $now,
@@ -103,14 +103,14 @@ class DemandeAchatService
                 $agencyName,
                 $serviceFeeAmount
             ),
-            'context' => [
+            'context' => json_encode([
                 'type' => 'purchase_service_fee_paid',
                 'purchase_request_id' => $purchaseRequest->id,
                 'vehicle_id' => $vehicle->id,
                 'agency_id' => $vehicle->agency_id,
                 'client_id' => $clientId,
                 'service_fee' => (float) $serviceFee,
-            ],
+            ]),
             'is_read' => false,
             'created_at' => $now,
             'updated_at' => $now,

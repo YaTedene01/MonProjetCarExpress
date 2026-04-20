@@ -26,7 +26,7 @@ class AuthService
     {
         $user = $this->users->create([
             'role' => UserRole::Client,
-            'name' => $data['name'] ?: $this->genererNomParDefautDepuisIdentifiants($data['email'], $data['phone']),
+            'name' => $data['name'] ?? $this->genererNomParDefautDepuisIdentifiants($data['email'] ?? null, $data['phone'] ?? null),
             'email' => $data['email'],
             'phone' => $data['phone'],
             'city' => $data['city'],

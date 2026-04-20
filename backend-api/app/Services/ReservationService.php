@@ -92,7 +92,7 @@ class ReservationService
                     $pickupDate,
                     $returnDate
                 ),
-                'context' => [
+                'context' => json_encode([
                     'type' => 'reservation_created',
                     'reservation_id' => $reservation->id,
                     'vehicle_id' => $vehicle->id,
@@ -100,7 +100,7 @@ class ReservationService
                     'client_id' => $clientId,
                     'pickup_date' => $pickupDate,
                     'return_date' => $returnDate,
-                ],
+                ]),
                 'is_read' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
