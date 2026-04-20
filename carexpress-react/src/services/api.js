@@ -84,6 +84,11 @@ async function fetchAbsoluteWithApiFallback(url, options) {
     try {
       const response = await fetch(`${baseUrl}${url}`, options);
 
+      if (response.ok && isUnexpectedHtmlResponse(url, response)) {
+        lastResponse = response;
+        continue;
+      }
+
       if (response.ok) {
         workingApiBaseUrl = baseUrl;
         return response;
@@ -104,6 +109,16 @@ async function fetchAbsoluteWithApiFallback(url, options) {
   }
 
   throw lastNetworkError || new Error("Connexion API impossible.");
+}
+
+function isUnexpectedHtmlResponse(url, response) {
+  if (!url.startsWith("/api/")) {
+    return false;
+  }
+
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+
+  return contentType.includes("text/html");
 }
 
 export function getApiBaseUrl() {
@@ -202,12 +217,11 @@ export async function apiDownload(path) {
   }
 
   const blob = await response.blob();
-  const contentDisposition = response.headers.get("content-disposition") || "";
-  const match = contentDisposition.match(/filename="?([^"]+)"?/i);
+  const filename = resolveFilenameFromHeaders(response.headers);
 
   return {
     blob,
-    filename: match?.[1] || "document",
+    filename,
     url: URL.createObjectURL(blob),
     mimeType: blob.type,
   };
@@ -236,13 +250,29 @@ export async function apiDownloadUrl(url) {
   }
 
   const blob = await response.blob();
-  const contentDisposition = response.headers.get("content-disposition") || "";
-  const match = contentDisposition.match(/filename=\"?([^\"]+)\"?/i);
+  const filename = resolveFilenameFromHeaders(response.headers);
 
   return {
     blob,
-    filename: match?.[1] || "document",
+    filename,
     url: URL.createObjectURL(blob),
     mimeType: blob.type,
   };
+}
+
+function resolveFilenameFromHeaders(headers) {
+  const contentDisposition = headers.get("content-disposition") || "";
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+
+  const asciiMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+
+  return asciiMatch?.[1] || "document";
 }
