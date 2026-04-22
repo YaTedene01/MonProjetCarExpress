@@ -20,6 +20,13 @@ class AgencyRepository
         return Agency::query()->withCount('vehicles')->latest()->get();
     }
 
+    public function findForAdminShow(Agency $agency): Agency
+    {
+        return $agency->load([
+            'vehicles' => fn ($query) => $query->latest(),
+        ])->loadCount('vehicles');
+    }
+
     public function create(array $data): Agency
     {
         return Agency::query()->create($data);

@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 
 class UserRepository
 {
@@ -13,11 +14,13 @@ class UserRepository
 
     public function findByRoleAndIdentifier(string $role, string $identifier): ?User
     {
+        $normalizedIdentifier = trim($identifier);
+
         return User::query()
             ->where('role', $role)
-            ->where(function ($query) use ($identifier): void {
-                $query->where('email', $identifier)
-                    ->orWhere('phone', $identifier);
+            ->where(function (Builder $query) use ($normalizedIdentifier): void {
+                $query->whereRaw('LOWER(email) = ?', [mb_strtolower($normalizedIdentifier)])
+                    ->orWhere('phone', $normalizedIdentifier);
             })
             ->first();
     }

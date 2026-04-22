@@ -52,7 +52,7 @@ function PriceSlider({ value, max, onChange, label, accent }) {
     <div>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
         <span style={{fontSize:12,color:S.text2}}>0 F</span>
-        <span style={{fontSize:13,fontWeight:500,fontFamily:'DM Mono,monospace'}}>{value.toLocaleString('fr-FR')} F</span>
+        <span style={{fontSize:13,fontWeight:500}}>{value.toLocaleString('fr-FR')} F</span>
       </div>
       <div style={{position:'relative',height:4,background:S.border,borderRadius:2,marginBottom:18}}>
         <div style={{position:'absolute',left:0,right:`${100-pct}%`,height:'100%',background:accent||'#0a0a0a',borderRadius:2}}/>

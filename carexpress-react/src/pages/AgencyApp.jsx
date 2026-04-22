@@ -49,10 +49,11 @@ const requestSteps = [
   { label: "Cloturees", value: 17, color: "#1a7a2e" },
 ];
 
-export default function AgencyApp({ onLogout, branding, chatThreads, sendChatMessage, onGoToLanding }) {
+export default function AgencyApp({ onLogout, branding, chatThreads, sendChatMessage, openChatThread, onGoToLanding }) {
   const [page, setPage] = useState("home");
   const [vehicles, setVehicles] = useState(initialAgencyVehicles);
   const [alerts, setAlerts] = useState(agencyAlerts);
+  const [initialThreadId, setInitialThreadId] = useState(null);
   const [showNewListing, setShowNewListing] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState(null);
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
@@ -64,10 +65,14 @@ export default function AgencyApp({ onLogout, branding, chatThreads, sendChatMes
     logoUrl: "",
   };
 
+  const unreadClientMessages = chatThreads.reduce(
+    (sum, thread) => sum + thread.messages.filter((m) => m.senderRole === "client").length,
+    0
+  );
   const navItems = [
     { key: "home", icon: "home", label: "Accueil" },
     { key: "annonces", icon: "grid", label: "Annonces" },
-    { key: "messages", icon: "bell", label: "Messages", badge: true },
+    { key: "messages", icon: "bell", label: "Messages", badge: unreadClientMessages > 0 },
     { key: "profil", icon: "user", label: "Profil" },
   ];
 
@@ -92,10 +97,45 @@ export default function AgencyApp({ onLogout, branding, chatThreads, sendChatMes
           sub: alert.message,
           time: formatAlertTime(alert.created_at),
           tone: "red",
+          context: alert.context || null,
         })));
       }
     });
   }, []);
+
+  const handleReplyToClient = async (alert) => {
+    const context = alert?.context || {};
+    const conversationId = context?.conversation_id ? String(context.conversation_id) : null;
+
+    if (conversationId) {
+      setInitialThreadId(conversationId);
+      setPage("messages");
+      return;
+    }
+
+    if (!openChatThread || !context?.vehicle_id || !context?.client_id) {
+      setInitialThreadId(null);
+      setPage("messages");
+      return;
+    }
+
+    try {
+      const threadId = await openChatThread({
+        vehicleId: context.vehicle_id,
+        clientId: context.client_id,
+        vehicleName: extractVehicleName(alert?.sub),
+        clientName: extractClientName(alert?.sub),
+        type: context?.type === "purchase_request_created" ? "achat" : "location",
+        subject: buildAgencyConversationSubject(alert, context),
+      });
+
+      setInitialThreadId(String(threadId));
+    } catch {
+      setInitialThreadId(null);
+    }
+
+    setPage("messages");
+  };
 
   const handleCreateListing = async (listing) => {
     const created = await createAgencyVehicle(toAgencyVehiclePayload(listing));
@@ -138,18 +178,33 @@ export default function AgencyApp({ onLogout, branding, chatThreads, sendChatMes
         }}
       />
       <section className="container-responsive" style={{ maxWidth: 1360, margin: "0 auto", padding: "20px 20px 0" }}>
-        {page === "home" && <AgencyHome setPage={setPage} vehicles={vehicles} alerts={alerts} onCreateListing={() => setShowNewListing(true)} branding={agencyBrand} dashboardMetrics={dashboardMetrics} />}
+        {page === "home" && <AgencyHome setPage={setPage} vehicles={vehicles} alerts={alerts} onCreateListing={() => setShowNewListing(true)} branding={agencyBrand} dashboardMetrics={dashboardMetrics} onReplyToClient={handleReplyToClient} />}
         {page === "annonces" && <AgencyAnnonces vehicles={vehicles} onCreateListing={() => setShowNewListing(true)} onEditVehicle={setEditingVehicle} onDeleteVehicle={(vehicleName) => setVehicles((current) => current.filter((item) => item.name !== vehicleName))} />}
-        {page === "messages" && <AgencyMessages chatThreads={chatThreads} branding={agencyBrand} sendChatMessage={sendChatMessage} />}
-        {page === "profil" && <AgencyProfil branding={agencyBrand} onLogout={onLogout} />}
+        {page === "messages" && <AgencyMessages chatThreads={chatThreads} branding={agencyBrand} sendChatMessage={sendChatMessage} initialThreadId={initialThreadId} />}
+        {page === "profil" && <AgencyProfil branding={agencyBrand} onLogout={onLogout} vehicles={vehicles} dashboardMetrics={dashboardMetrics} alerts={alerts} chatThreads={chatThreads} />}
         </section>
       <BottomNav items={navItems} active={page} onChange={setPage} />
     </div>
   );
 }
 
-function AgencyHome({ setPage, vehicles, alerts, onCreateListing, branding, dashboardMetrics }) {
-  const occupancy = 84;
+function AgencyHome({ setPage, vehicles, alerts, onCreateListing, branding, dashboardMetrics, onReplyToClient }) {
+  const onlineVehicles = vehicles.filter((item) => item.status !== "Maintenance").length;
+  const rentedVehicles = vehicles.filter((item) => item.status === "Loue").length;
+  const saleVehicles = vehicles.filter((item) => item.type === "Vente").length;
+  const occupancy = onlineVehicles ? Math.round((rentedVehicles / onlineVehicles) * 100) : 0;
+  const performanceBars = [
+    { label: "En ligne", value: onlineVehicles ? Math.round((onlineVehicles / Math.max(vehicles.length, 1)) * 100) : 0 },
+    { label: "Loue", value: occupancy },
+    { label: "En vente", value: vehicles.length ? Math.round((saleVehicles / vehicles.length) * 100) : 0 },
+    { label: "Alertes", value: Math.min(100, alerts.length * 10) },
+  ];
+  const requestSteps = [
+    { label: "Demandes recues", value: (dashboardMetrics?.active_rentals || 0) + (dashboardMetrics?.purchase_requests_count || 0), color: "#17130f" },
+    { label: "Locations confirmees", value: dashboardMetrics?.active_rentals || 0, color: "#5f5750" },
+    { label: "Demandes achat", value: dashboardMetrics?.purchase_requests_count || 0, color: "#D40511" },
+    { label: "Alertes ouvertes", value: alerts.length, color: "#1a7a2e" },
+  ];
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
@@ -168,10 +223,10 @@ function AgencyHome({ setPage, vehicles, alerts, onCreateListing, branding, dash
       />
 
       <div style={autoGrid(220)}>
-        <MetricCard label="Vehicules actifs" value={String(dashboardMetrics?.vehicles_count ?? vehicles.length)} sub="+2 ajoutes ce mois" accent={S.red} />
+        <MetricCard label="Vehicules actifs" value={String(dashboardMetrics?.vehicles_count ?? vehicles.length)} sub={`${onlineVehicles} visibles actuellement`} accent={S.red} />
         <MetricCard label="Demandes recues" value={String((dashboardMetrics?.active_rentals || 0) + (dashboardMetrics?.purchase_requests_count || 0))} sub="location et achat" accent={S.black} />
         <MetricCard label="Revenus du mois" value={`${Number(dashboardMetrics?.monthly_revenue || 0).toLocaleString("fr-FR")} F`} sub="Location, achat et frais service" accent={S.gold} />
-        <MetricCard label="Taux d'occupation" value={`${occupancy}%`} sub="Objectif mensuel 90%" accent={S.success} />
+        <MetricCard label="Taux d'occupation" value={`${occupancy}%`} sub={`${rentedVehicles} vehicule${rentedVehicles > 1 ? "s" : ""} loue${rentedVehicles > 1 ? "s" : ""}`} accent={S.success} />
       </div>
 
       <div style={dashboardGrid()}>
@@ -214,11 +269,12 @@ function AgencyHome({ setPage, vehicles, alerts, onCreateListing, branding, dash
         <Panel
           title="Notifications agence"
           subtitle="Dernieres reservations et alertes importantes"
+          right={<ActionLink onClick={() => setPage("messages")}>Aller aux messages</ActionLink>}
         >
           {alerts.length > 0 ? (
             <div style={{ display: "grid", gap: 10 }}>
               {alerts.slice(0, 4).map((alert) => (
-                <AlertRow key={`${alert.title}-${alert.time}`} alert={alert} />
+                <AlertRow key={`${alert.title}-${alert.time}`} alert={alert} onReply={() => onReplyToClient ? onReplyToClient(alert) : setPage("messages")} />
               ))}
             </div>
           ) : (
@@ -237,6 +293,7 @@ function AgencyAnnonces({ vehicles, onCreateListing, onEditVehicle, onDeleteVehi
     if (filter === "Tous") return vehicles;
     return vehicles.filter((item) => item.type === filter);
   }, [filter, vehicles]);
+  const followUpCount = vehicles.filter((item) => Number(item.views || 0) > 0 && Number(item.views || 0) < 3).length;
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
@@ -257,7 +314,7 @@ function AgencyAnnonces({ vehicles, onCreateListing, onEditVehicle, onDeleteVehi
           <SoftMetric label="En ligne" value={String(vehicles.filter((item) => item.status !== "Maintenance").length)} sub="visibles maintenant" />
           <SoftMetric label="Loue" value={String(vehicles.filter((item) => item.status === "Loue").length)} sub="en cours de reservation" />
           <SoftMetric label="En vente" value={String(vehicles.filter((item) => item.type === "Vente").length)} sub="dossiers ouverts" />
-          <SoftMetric label="A relancer" value="0" sub="visiteurs sans suite" />
+          <SoftMetric label="A relancer" value={String(followUpCount)} sub="annonces avec peu de vues" />
         </div>
       </Panel>
 
@@ -318,14 +375,35 @@ function AgencyAnnonces({ vehicles, onCreateListing, onEditVehicle, onDeleteVehi
   );
 }
 
-function AgencyMessages({ chatThreads, branding, sendChatMessage }) {
+function AgencyMessages({ chatThreads, branding, sendChatMessage, initialThreadId }) {
+  const hotCases = chatThreads.filter((thread) => thread.messages.some((item) => item.senderRole === "client")).length;
+  const clientMsgCount = chatThreads.reduce((sum, thread) => sum + thread.messages.filter((item) => item.senderRole === "client").length, 0);
+  const newThreads = chatThreads.filter((thread) => {
+    const last = thread.messages[thread.messages.length - 1];
+    return last && last.senderRole === "client";
+  });
+
   return (
     <div style={{ display: "grid", gap: 18 }}>
       <div style={autoGrid(210)}>
         <SoftMetric label="Conversations actives" value={String(chatThreads.length)} sub="clients a suivre" />
-        <SoftMetric label="Messages clients" value={String(chatThreads.reduce((sum, thread) => sum + thread.messages.filter((item) => item.senderRole === "client").length, 0))} sub="questions et confirmations" />
-        <SoftMetric label="Dossiers chauds" value="2" sub="achat et location a relancer" />
+        <SoftMetric label="Messages clients" value={String(clientMsgCount)} sub="questions et confirmations" />
+        <SoftMetric label="Dossiers chauds" value={String(hotCases)} sub="achat et location a relancer" />
       </div>
+
+      {newThreads.length > 0 && (
+        <div style={{ padding: "14px 18px", borderRadius: 20, background: "rgba(212,5,17,0.06)", border: "1px solid rgba(212,5,17,0.16)", display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <span style={{ fontSize: 20, flexShrink: 0 }}>🔔</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: S.red }}>
+              {newThreads.length} conversation{newThreads.length > 1 ? "s" : ""} avec message client en attente
+            </div>
+            <div style={{ marginTop: 4, fontSize: 13, color: S.text2, lineHeight: 1.6 }}>
+              {newThreads.map((t) => t.subject).join(" · ")}
+            </div>
+          </div>
+        </div>
+      )}
 
       <Panel title="Messagerie client" subtitle="Centralisez les echanges avec les clients pour confirmer les reservations et suivre les ventes.">
         <ChatPanel
@@ -337,14 +415,21 @@ function AgencyMessages({ chatThreads, branding, sendChatMessage }) {
           emptyTitle="Aucune conversation"
           emptySubtitle="Les demandes de location et d'achat apparaitront ici pour permettre un suivi direct avec les clients."
           onSend={sendChatMessage}
+          initialThreadId={initialThreadId}
         />
       </Panel>
     </div>
   );
 }
 
-function AgencyProfil({ onLogout, branding }) {
+function AgencyProfil({ onLogout, branding, vehicles, dashboardMetrics, alerts, chatThreads }) {
   const [activeSection, setActiveSection] = useState("Modifier les informations agence");
+  const activeListings = vehicles.length;
+  const rentalListings = vehicles.filter((vehicle) => vehicle.type === "Location").length;
+  const saleListings = vehicles.filter((vehicle) => vehicle.type === "Vente").length;
+  const monthlyRevenue = Number(dashboardMetrics?.monthly_revenue || 0).toLocaleString("fr-FR");
+  const totalRequests = (dashboardMetrics?.active_rentals || 0) + (dashboardMetrics?.purchase_requests_count || 0);
+  const conversionRate = totalRequests ? Math.round(((dashboardMetrics?.active_rentals || 0) / totalRequests) * 100) : 0;
   const items = [
     { icon: "edit", label: "Modifier les informations agence" },
     { icon: "grid", label: "Gerer les annonces" },
@@ -369,29 +454,29 @@ function AgencyProfil({ onLogout, branding }) {
       title: "Gestion des annonces",
       subtitle: "Resume rapide de vos vehicules et de leur statut.",
       items: [
-        { label: "Annonces actives", value: "12 annonces en ligne" },
-        { label: "En location", value: "9 vehicules disponibles ou loues" },
-        { label: "En vente", value: "3 vehicules avec dossier ouvert" },
-        { label: "Priorite", value: "1 vehicule en maintenance a remettre en ligne" },
+        { label: "Annonces actives", value: `${activeListings} annonce${activeListings > 1 ? "s" : ""} en ligne` },
+        { label: "En location", value: `${rentalListings} vehicule${rentalListings > 1 ? "s" : ""} location` },
+        { label: "En vente", value: `${saleListings} vehicule${saleListings > 1 ? "s" : ""} en vente` },
+        { label: "Priorite", value: `${vehicles.filter((vehicle) => vehicle.status === "Maintenance").length} vehicule${vehicles.filter((vehicle) => vehicle.status === "Maintenance").length > 1 ? "s" : ""} en maintenance` },
       ],
     },
     "Revenus et statistiques": {
       title: "Revenus et statistiques",
       subtitle: "Les chiffres utiles pour piloter l'activite de l'agence.",
       items: [
-        { label: "Revenus du mois", value: "1,2 M F CFA" },
-        { label: "Demandes traitees", value: "38 demandes clients" },
-        { label: "Taux d'occupation", value: "84%" },
-        { label: "Conversion", value: "55% de demandes confirmees" },
+        { label: "Revenus du mois", value: `${monthlyRevenue} F CFA` },
+        { label: "Demandes traitees", value: `${totalRequests} demandes clients` },
+        { label: "Taux d'occupation", value: `${activeListings ? Math.round((vehicles.filter((vehicle) => vehicle.status === "Loue").length / activeListings) * 100) : 0}%` },
+        { label: "Conversion", value: `${conversionRate}% de demandes confirmees` },
       ],
     },
     "Avis et reputation": {
       title: "Avis et reputation",
       subtitle: "Vos retours clients et la perception de votre agence.",
       items: [
-        { label: "Note moyenne", value: "4,8 / 5" },
-        { label: "Dernier avis", value: "Toyota Prado · client satisfait apres restitution" },
-        { label: "Temps de reponse", value: "24 min en moyenne" },
+        { label: "Conversations clientes", value: `${chatThreads.length} conversation${chatThreads.length > 1 ? "s" : ""}` },
+        { label: "Dernier avis", value: "Aucun module d'avis detaille disponible pour le moment" },
+        { label: "Temps de reponse", value: `${alerts.length} notification${alerts.length > 1 ? "s" : ""} a suivre` },
         { label: "Statut", value: "Agence certifiee" },
       ],
     },
@@ -435,16 +520,16 @@ function AgencyProfil({ onLogout, branding }) {
             <div style={{ fontSize: 14, color: S.text3, marginTop: 4 }}>{branding.activity} · {branding.city}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
               <Chip tone="gold">Agence certifiee</Chip>
-              <Chip tone="success">4,8/5 avis</Chip>
-              <Chip tone="dark">Reponse moyenne 24 min</Chip>
+              <Chip tone="success">{totalRequests} demande{totalRequests > 1 ? "s" : ""}</Chip>
+              <Chip tone="dark">{chatThreads.length} conversation{chatThreads.length > 1 ? "s" : ""}</Chip>
             </div>
           </div>
         </div>
 
         <div style={{ ...autoGrid(180, 14), marginTop: 18 }}>
-          <SoftMetric label="Annonces actives" value="12" sub="location et vente" />
-          <SoftMetric label="Demandes traitees" value="38" sub="sur le mois" />
-          <SoftMetric label="Taux de conversion" value="55%" sub="demandes confirmees" />
+          <SoftMetric label="Annonces actives" value={String(activeListings)} sub="location et vente" />
+          <SoftMetric label="Demandes traitees" value={String(totalRequests)} sub="sur le mois" />
+          <SoftMetric label="Taux de conversion" value={`${conversionRate}%`} sub="demandes confirmees" />
         </div>
       </Panel>
 
@@ -641,9 +726,16 @@ function EmptyState({ title, subtitle, actionLabel, onAction }) {
   );
 }
 
-function AlertRow({ alert }) {
+function AlertRow({ alert, onReply }) {
   const toneColor = alert.tone === "red" ? S.red : alert.tone === "gold" ? "#8b6800" : S.text3;
   const toneBg = alert.tone === "red" ? S.redSoft : alert.tone === "gold" ? S.goldSoft : "rgba(24,21,18,0.04)";
+  const isClientAction = alert.title && (
+    alert.title.includes("reservation") ||
+    alert.title.includes("réservation") ||
+    alert.title.includes("achat") ||
+    alert.title.includes("Reservation") ||
+    alert.title.includes("Nouvelle")
+  );
 
   return (
     <div style={{
@@ -653,13 +745,22 @@ function AlertRow({ alert }) {
       alignItems: "start",
       padding: "14px 16px",
       borderRadius: 18,
-      border: `1px solid ${S.border}`,
-      background: "rgba(255,255,255,0.76)",
+      border: `1px solid ${alert.read ? S.border : toneColor + "44"}`,
+      background: alert.read ? "rgba(255,255,255,0.76)" : `${toneColor}06`,
     }}>
       <div style={{ width: 10, height: 10, borderRadius: "50%", background: alert.read ? S.borderStrong : toneColor, marginTop: 6 }} />
       <div>
         <div style={{ fontSize: 15, fontWeight: 600, color: S.text }}>{alert.title}</div>
         <div style={{ marginTop: 4, fontSize: 13, color: S.text3, lineHeight: 1.6 }}>{alert.sub}</div>
+        {isClientAction && onReply && (
+          <button
+            type="button"
+            onClick={onReply}
+            style={{ marginTop: 8, border: "none", background: "none", color: S.red, cursor: "pointer", fontSize: 12, fontWeight: 700, padding: 0, textDecoration: "underline" }}
+          >
+            Répondre au client →
+          </button>
+        )}
       </div>
       <div style={{ textAlign: "right", display: "grid", gap: 8 }}>
         <span style={{ fontSize: 11, color: toneColor, background: toneBg, padding: "5px 10px", borderRadius: 999 }}>{alert.time}</span>
@@ -701,6 +802,27 @@ function formatAlertTime(createdAt) {
 
   const diffDays = Math.floor(diffHours / 24);
   return `Il y a ${diffDays} j`;
+}
+
+function extractClientName(message = "") {
+  const match = String(message).match(/^([^ ](?:.*?)) a (reserve|confirme)/i);
+  return match?.[1] || "Client";
+}
+
+function extractVehicleName(message = "") {
+  const reserveMatch = String(message).match(/a reserve (.+?) du /i);
+  if (reserveMatch?.[1]) return reserveMatch[1];
+
+  const purchaseMatch = String(message).match(/achat de (.+?)\./i);
+  if (purchaseMatch?.[1]) return purchaseMatch[1];
+
+  return "Vehicule";
+}
+
+function buildAgencyConversationSubject(alert, context = {}) {
+  const vehicleName = extractVehicleName(alert?.sub);
+  const type = context?.type === "purchase_request_created" ? "Achat" : "Location";
+  return `${vehicleName} · ${type}`;
 }
 
 function StatusBadge({ value }) {
@@ -814,11 +936,20 @@ function parseVehicleToForm(vehicle) {
       type: "Location",
       name: "",
       category: "SUV",
+      year: String(new Date().getFullYear()),
       detail: "",
       price: "",
       city: "Dakar",
       seats: "5",
+      doors: "5",
       transmission: "Automatique",
+      fuelType: "",
+      engine: "",
+      consumption: "",
+      horsepower: "",
+      equipment: "Climatisation, Bluetooth, ABS",
+      availableFrom: "",
+      availableTo: "",
       photos: [],
     };
   }
@@ -827,19 +958,34 @@ function parseVehicleToForm(vehicle) {
   const category = parts[0] || "SUV";
   const seats = (parts[1]?.match(/\d+/)?.[0]) || "5";
   const price = (parts[2] || "").replace(/[^\d]/g, "") || "";
+  const specifications = vehicle.raw?.specifications && typeof vehicle.raw.specifications === "object"
+    ? vehicle.raw.specifications
+    : {};
 
   return {
     type: vehicle.type || "Location",
     name: vehicle.name || "",
     category,
+    year: String(vehicle.raw?.year || vehicle.year || new Date().getFullYear()),
     detail: vehicle.commercialDetail || vehicle.detail || "",
     price,
     city: vehicle.city || "Dakar",
     seats,
+    doors: String(vehicle.raw?.doors || 5),
     transmission: vehicle.transmission || "Automatique",
+    fuelType: vehicle.raw?.fuel_type || "",
+    engine: vehicle.raw?.engine || "",
+    consumption: vehicle.raw?.consumption || "",
+    horsepower: vehicle.raw?.horsepower || "",
+    equipment: Array.isArray(vehicle.raw?.equipment) && vehicle.raw.equipment.length
+      ? vehicle.raw.equipment.join(", ")
+      : "Climatisation, Bluetooth, ABS",
+    availableFrom: specifications.available_from || "",
+    availableTo: specifications.available_to || "",
     photos: (vehicle.images || []).map((url, index) => ({
       name: `photo-${index + 1}`,
       url,
+      file: null,
     })),
   };
 }
@@ -850,29 +996,63 @@ function toAgencyVehiclePayload(listing) {
   const words = (listing.name || "").trim().split(/\s+/);
   const brand = words[0] || "Marque";
   const model = words.slice(1).join(" ") || listing.category || "Modele";
-  const pricing = getPricingDetails(type, Number(listing.price || 0));
+  const cleanPrice = Number(String(listing.price || "").replace(/[^\d]/g, "") || 0);
+  const pricing = getPricingDetails(type, cleanPrice);
 
-  return {
-    listing_type: type,
-    name: listing.name,
-    brand,
-    model,
-    year: Number(listing.year || new Date().getFullYear()),
-    category: listing.category || "SUV",
-    class_name: listing.type === "Vente" ? "Standard" : "Location",
-    price: Number(listing.price || 0),
-    price_unit: type === "sale" ? "fixed" : "day",
-    service_fee: pricing?.adminShare ?? null,
-    city: listing.city || "Dakar",
-    status,
-    summary: listing.detail,
-    description: listing.detail,
-    seats: Number(listing.seats || 5),
-    transmission: listing.transmission || "Automatique",
-    gallery: [],
-    equipment: ["Climatisation", "Bluetooth", "ABS"],
-    tags: [listing.category || "Vehicule", listing.city || "Dakar"],
-  };
+  const payload = new FormData();
+  const galleryUrls = (listing.photos || [])
+    .filter((photo) => !photo.file && photo.url)
+    .map((photo) => photo.url);
+  const equipmentItems = String(listing.equipment || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  [
+    ["listing_type", type],
+    ["name", listing.name],
+    ["brand", brand],
+    ["model", model],
+    ["year", String(Number(listing.year || new Date().getFullYear()))],
+    ["category", listing.category || "SUV"],
+    ["class_name", listing.type === "Vente" ? "Standard" : "Location"],
+    ["price", String(cleanPrice)],
+    ["price_unit", type === "sale" ? "fixed" : "day"],
+    ["city", listing.city || "Dakar"],
+    ["status", status],
+    ["summary", listing.detail || ""],
+    ["description", listing.detail || ""],
+    ["seats", String(Number(listing.seats || 5))],
+    ["doors", String(Number(listing.doors || 5))],
+    ["transmission", listing.transmission || "Automatique"],
+    ["fuel_type", listing.fuelType || ""],
+    ["engine", listing.engine || ""],
+    ["consumption", listing.consumption || ""],
+    ["horsepower", listing.horsepower || ""],
+  ].forEach(([key, value]) => payload.append(key, value));
+
+  if (pricing?.adminShare != null) {
+    payload.append("service_fee", String(pricing.adminShare));
+  }
+
+  if (type === "rental") {
+    if (listing.availableFrom) {
+      payload.append("specifications[available_from]", listing.availableFrom);
+    }
+
+    if (listing.availableTo) {
+      payload.append("specifications[available_to]", listing.availableTo);
+    }
+  }
+
+  equipmentItems.forEach((item) => payload.append("equipment[]", item));
+  [listing.category || "Vehicule", listing.city || "Dakar"].forEach((item) => payload.append("tags[]", item));
+  galleryUrls.forEach((url) => payload.append("gallery[]", url));
+  (listing.photos || [])
+    .filter((photo) => photo.file instanceof File)
+    .forEach((photo) => payload.append("gallery_files[]", photo.file));
+
+  return payload;
 }
 
 function NewListingModal({ onClose, onSubmit, initialData }) {
@@ -881,7 +1061,9 @@ function NewListingModal({ onClose, onSubmit, initialData }) {
   });
   const [errors, setErrors] = useState({});
   const [photoError, setPhotoError] = useState("");
-  const pricing = getPricingDetails(form.type === "Vente" ? "sale" : "rental", Number(form.price || 0));
+  const [isLoading, setIsLoading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const pricing = getPricingDetails(form.type === "Vente" ? "sale" : "rental", Number(String(form.price || "").replace(/[^\d]/g, "") || 0));
 
   const update = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -894,6 +1076,7 @@ function NewListingModal({ onClose, onSubmit, initialData }) {
     const next = files.slice(0, 4).map((file) => ({
       name: file.name,
       url: URL.createObjectURL(file),
+      file,
     }));
     setForm((current) => ({ ...current, photos: next }));
     setPhotoError(files.length > 4 ? "Maximum 4 photos par annonce." : "");
@@ -904,34 +1087,48 @@ function NewListingModal({ onClose, onSubmit, initialData }) {
     ["name", "detail", "price"].forEach((key) => {
       if (!form[key]) nextErrors[key] = "Champ requis.";
     });
-    if (form.price && !pricing) {
-      nextErrors.price = form.type === "Vente"
-        ? "Le prix de vente doit respecter la grille Car Express a partir de 500 000 F CFA."
-        : "Le prix location doit respecter la grille Car Express a partir de 20 000 F CFA / jour.";
-    }
     if (!form.photos?.length) setPhotoError("Ajoutez au moins une photo.");
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0 || !form.photos?.length) return;
 
-    const status = form.type === "Vente" ? "En vente" : "Disponible";
-    const priceLabel = form.type === "Vente" ? `${form.price} F` : `${form.price} F / jour`;
-    await onSubmit({
-      name: form.name,
-      detail: `${form.category} · ${form.seats} places · ${priceLabel}`,
-      commercialDetail: form.detail,
-      status,
-      type: form.type,
-      revenue: pricing
-        ? `${pricing.percentage}% admin · ${formatMoney(pricing.adminShare)} F${form.type === "Vente" ? "" : " / jour"}`
-        : (initialData?.revenue || "Nouvelle annonce"),
-      views: initialData?.views ?? 0,
-      urgent: initialData?.urgent ?? false,
-      images: form.photos.map((photo) => photo.url),
-      city: form.city,
-      transmission: form.transmission,
-      category: form.category,
-      seats: form.seats,
-    });
+    setIsLoading(true);
+    setSubmitError("");
+    try {
+      const status = form.type === "Vente" ? "En vente" : "Disponible";
+      const priceLabel = form.type === "Vente" ? `${form.price} F` : `${form.price} F / jour`;
+      await onSubmit({
+        name: form.name,
+        price: form.price,
+        photos: form.photos,
+        detail: `${form.category} · ${form.seats} places · ${priceLabel}`,
+        commercialDetail: form.detail,
+        status,
+        type: form.type,
+        revenue: pricing
+          ? `${pricing.percentage}% admin · ${formatMoney(pricing.adminShare)} F${form.type === "Vente" ? "" : " / jour"}`
+          : (initialData?.revenue || "Nouvelle annonce"),
+        views: initialData?.views ?? 0,
+        urgent: initialData?.urgent ?? false,
+        images: form.photos.map((photo) => photo.url),
+        city: form.city,
+        year: form.year,
+        transmission: form.transmission,
+        category: form.category,
+        seats: form.seats,
+        doors: form.doors,
+        fuelType: form.fuelType,
+        engine: form.engine,
+        consumption: form.consumption,
+        horsepower: form.horsepower,
+        equipment: form.equipment,
+        availableFrom: form.availableFrom,
+        availableTo: form.availableTo,
+      });
+    } catch (error) {
+      setSubmitError(error?.message || "Une erreur est survenue. Veuillez reessayer.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -962,8 +1159,14 @@ function NewListingModal({ onClose, onSubmit, initialData }) {
                 {["SUV", "Berline", "Van", "Pick-up", "Minibus", "Luxe"].map((item) => <option key={item}>{item}</option>)}
               </select>
             </FormFieldBlock>
-            <FormFieldBlock label={form.type === "Vente" ? "Prix fixe" : "Prix par jour"} error={errors.price}>
-              <input value={form.price} onChange={(e) => update("price", e.target.value)} placeholder="75000" style={modalInputStyle(Boolean(errors.price))} />
+            <FormFieldBlock label={form.type === "Vente" ? "Prix fixe (F CFA)" : "Prix par jour (F CFA)"} error={errors.price}>
+              <input
+                value={form.price}
+                onChange={(e) => update("price", e.target.value.replace(/[^\d]/g, ""))}
+                placeholder={form.type === "Vente" ? "500000" : "25000"}
+                inputMode="numeric"
+                style={modalInputStyle(Boolean(errors.price))}
+              />
             </FormFieldBlock>
             <FormFieldBlock label="Ville">
               <select value={form.city} onChange={(e) => update("city", e.target.value)} style={modalInputStyle(false)}>
@@ -975,10 +1178,47 @@ function NewListingModal({ onClose, onSubmit, initialData }) {
                 {["2", "4", "5", "7", "9", "14"].map((item) => <option key={item}>{item}</option>)}
               </select>
             </FormFieldBlock>
+            <FormFieldBlock label="Annee">
+              <input value={form.year} onChange={(e) => update("year", e.target.value.replace(/[^\d]/g, "").slice(0, 4))} placeholder="2024" inputMode="numeric" style={modalInputStyle(false)} />
+            </FormFieldBlock>
+            <FormFieldBlock label="Nombre de portes">
+              <select value={form.doors} onChange={(e) => update("doors", e.target.value)} style={modalInputStyle(false)}>
+                {["2", "3", "4", "5"].map((item) => <option key={item}>{item}</option>)}
+              </select>
+            </FormFieldBlock>
             <FormFieldBlock label="Transmission">
               <select value={form.transmission} onChange={(e) => update("transmission", e.target.value)} style={modalInputStyle(false)}>
                 {["Automatique", "Manuelle"].map((item) => <option key={item}>{item}</option>)}
               </select>
+            </FormFieldBlock>
+          </div>
+
+          {form.type === "Location" && (
+            <div style={autoGrid(220, 14)}>
+              <FormFieldBlock label="Disponible a partir du">
+                <input type="date" value={form.availableFrom} onChange={(e) => update("availableFrom", e.target.value)} style={modalInputStyle(false)} />
+              </FormFieldBlock>
+              <FormFieldBlock label="Disponible jusqu'au">
+                <input type="date" value={form.availableTo} onChange={(e) => update("availableTo", e.target.value)} style={modalInputStyle(false)} />
+              </FormFieldBlock>
+            </div>
+          )}
+
+          <div style={autoGrid(220, 14)}>
+            <FormFieldBlock label="Carburant">
+              <select value={form.fuelType} onChange={(e) => update("fuelType", e.target.value)} style={modalInputStyle(false)}>
+                <option value="">Choisir</option>
+                {["Essence", "Diesel", "Hybride", "Electrique", "GPL"].map((item) => <option key={item}>{item}</option>)}
+              </select>
+            </FormFieldBlock>
+            <FormFieldBlock label="Cylindree">
+              <input value={form.engine} onChange={(e) => update("engine", e.target.value)} placeholder="Ex : 2 000 cm3" style={modalInputStyle(false)} />
+            </FormFieldBlock>
+            <FormFieldBlock label="Conso.">
+              <input value={form.consumption} onChange={(e) => update("consumption", e.target.value)} placeholder="Ex : 7,2 L/100km" style={modalInputStyle(false)} />
+            </FormFieldBlock>
+            <FormFieldBlock label="Puissance">
+              <input value={form.horsepower} onChange={(e) => update("horsepower", e.target.value)} placeholder="Ex : 150 ch" style={modalInputStyle(false)} />
             </FormFieldBlock>
           </div>
 
@@ -1035,6 +1275,15 @@ function NewListingModal({ onClose, onSubmit, initialData }) {
             <textarea value={form.detail} onChange={(e) => update("detail", e.target.value)} placeholder="Ex : SUV confortable, carnet a jour, ideal deplacements urbains et professionnels." style={{ ...modalInputStyle(Boolean(errors.detail)), minHeight: 120, resize: "vertical" }} />
           </FormFieldBlock>
 
+          <FormFieldBlock label="Equipements">
+            <textarea
+              value={form.equipment}
+              onChange={(e) => update("equipment", e.target.value)}
+              placeholder="Ex : Climatisation, Bluetooth, ABS, Camera de recul"
+              style={{ ...modalInputStyle(false), minHeight: 96, resize: "vertical" }}
+            />
+          </FormFieldBlock>
+
           <div style={{ borderRadius: 20, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.72)", padding: 16 }}>
             <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", color: S.text3, marginBottom: 10 }}>Apercu annonce</div>
             <div style={{ fontSize: 18, fontWeight: 700, color: S.text }}>{form.name || "Nom du vehicule"}</div>
@@ -1056,9 +1305,16 @@ function NewListingModal({ onClose, onSubmit, initialData }) {
             </div>
           </div>
 
+          {submitError && (
+            <div style={{ padding: "12px 16px", borderRadius: 14, background: S.redSoft, border: `1px solid rgba(212,5,17,0.18)`, color: S.red, fontSize: 13, lineHeight: 1.6 }}>
+              {submitError}
+            </div>
+          )}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
-            <button onClick={onClose} style={ghostButtonStyle()}>Annuler</button>
-            <Btn onClick={handleSubmit} accent={S.red} style={{ width: "auto", paddingInline: 22 }}>{initialData ? "Enregistrer les modifications" : "Publier l'annonce"}</Btn>
+            <button onClick={onClose} disabled={isLoading} style={{ ...ghostButtonStyle(), opacity: isLoading ? 0.5 : 1 }}>Annuler</button>
+            <Btn onClick={handleSubmit} accent={S.red} style={{ width: "auto", paddingInline: 22, opacity: isLoading ? 0.7 : 1, pointerEvents: isLoading ? "none" : "auto" }}>
+              {isLoading ? (initialData ? "Enregistrement..." : "Publication...") : (initialData ? "Enregistrer les modifications" : "Publier l'annonce")}
+            </Btn>
           </div>
         </div>
       </div>

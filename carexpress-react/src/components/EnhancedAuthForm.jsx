@@ -120,14 +120,28 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
     setError("");
     setSuccessMessage("");
     setFieldErrors((prev) => ({ ...prev, logo: "" }));
+    if (e.target) {
+      e.target.value = "";
+    }
   };
 
   const handleDocumentsChange = (e) => {
     const files = Array.from(e.target.files || []);
-    setFormData((prev) => ({ ...prev, documents: files }));
+    setFormData((prev) => {
+      const existingFiles = Array.isArray(prev.documents) ? prev.documents : [];
+      const mergedFiles = [...existingFiles, ...files].filter((file, index, array) => {
+        const signature = `${file.name}-${file.size}-${file.lastModified}`;
+        return array.findIndex((item) => `${item.name}-${item.size}-${item.lastModified}` === signature) === index;
+      });
+
+      return { ...prev, documents: mergedFiles };
+    });
     setError("");
     setSuccessMessage("");
     setFieldErrors((prev) => ({ ...prev, documents: "" }));
+    if (e.target) {
+      e.target.value = "";
+    }
   };
 
   const passwordStrength = getPasswordStrength(formData.password);
@@ -196,6 +210,29 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
 
     try {
       await onSubmit({ ...formData, mode: role === "client" ? clientMode : role === "agency" ? agencyMode : "login" });
+
+      if (role === "client" && clientMode === "signup") {
+        setSuccessMessage("Inscription reussie. Connectez-vous maintenant pour acceder a la plateforme.");
+        setClientMode("login");
+        setFormData({
+          identifier: formData.email || "",
+          email: "",
+          phone: "",
+          city: "",
+          activity: "",
+          managerName: "",
+          district: "",
+          address: "",
+          ninea: "",
+          color: "#D40511",
+          logo: null,
+          password: "",
+          confirmPassword: "",
+          company: "",
+          twoFactorCode: "",
+          documents: [],
+        });
+      }
 
       if (role === "agency" && agencyMode === "signup") {
         setSuccessMessage("Votre demande agence a ete envoyee. Vous pourrez vous connecter uniquement apres validation par l'administrateur.");
@@ -389,7 +426,12 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
                       name="activity"
                       value={formData.activity || ""}
                       onChange={handleInputChange}
-                      placeholder="Location et vente"
+                      placeholder="Choisissez l'activite"
+                      options={[
+                        { value: "Location", label: "Location" },
+                        { value: "Vente", label: "Vente" },
+                        { value: "Location et vente", label: "Location et vente" },
+                      ]}
                     />
                     <Field
                       label="Responsable agence"
@@ -442,26 +484,19 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
                       </div>
                       {fieldErrors.color ? <span style={styles.fieldError}>{fieldErrors.color}</span> : null}
                     </label>
-                    <label style={styles.fieldWrap}>
+                    <div style={styles.fieldWrap}>
                       <span style={styles.label}>Logo de l'agence</span>
                       <div
                         style={{ ...styles.fileDropzone, ...(fieldErrors.logo ? styles.inputError : {}) }}
-                        onClick={() => logoInputRef.current?.click()}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            logoInputRef.current?.click();
-                          }
-                        }}
                       >
                         <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} style={{ display: "none" }} />
-                        <span style={styles.fileButton}>Joindre le logo</span>
+                        <button type="button" style={styles.fileButton} onClick={() => logoInputRef.current?.click()}>
+                          Joindre le logo
+                        </button>
                         <span style={styles.fileText}>{formData.logo?.name || "JPG, PNG ou WEBP, 5 Mo maximum."}</span>
                       </div>
                       {fieldErrors.logo ? <span style={styles.fieldError}>{fieldErrors.logo}</span> : null}
-                    </label>
+                    </div>
                     <FileField
                       label="Documents justificatifs"
                       error={fieldErrors.documents}
@@ -551,11 +586,22 @@ export function EnhancedAuthForm({ title, subtitle, onSubmit, onBack, role }) {
   );
 }
 
-function Field({ label, name, value, onChange, placeholder, type = "text", error, hint }) {
+function Field({ label, name, value, onChange, placeholder, type = "text", error, hint, options }) {
+  const inputStyle = { ...styles.input, ...(error ? styles.inputError : {}) };
+
   return (
     <label style={styles.fieldWrap}>
       <span style={styles.label}>{label}</span>
-      <input type={type} name={name} value={value} onChange={onChange} placeholder={placeholder} style={{ ...styles.input, ...(error ? styles.inputError : {}) }} />
+      {Array.isArray(options) && options.length ? (
+        <select name={name} value={value} onChange={onChange} style={inputStyle}>
+          <option value="" disabled>{placeholder}</option>
+          {options.map((option) => (
+            <option key={`${name}-${option.value}`} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      ) : (
+        <input type={type} name={name} value={value} onChange={onChange} placeholder={placeholder} style={inputStyle} />
+      )}
       {error ? <span style={styles.fieldError}>{error}</span> : hint ? <span style={styles.fieldHint}>{hint}</span> : null}
     </label>
   );
@@ -563,22 +609,15 @@ function Field({ label, name, value, onChange, placeholder, type = "text", error
 
 function FileField({ label, error, hint, files, onChange, inputRef }) {
   return (
-    <label style={styles.fieldWrap}>
+    <div style={styles.fieldWrap}>
       <span style={styles.label}>{label}</span>
       <div
         style={{ ...styles.fileDropzone, ...(error ? styles.inputError : {}) }}
-        onClick={() => inputRef?.current?.click()}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            inputRef?.current?.click();
-          }
-        }}
       >
         <input ref={inputRef} type="file" multiple onChange={onChange} style={{ display: "none" }} />
-        <span style={styles.fileButton}>Joindre des fichiers</span>
+        <button type="button" style={styles.fileButton} onClick={() => inputRef?.current?.click()}>
+          Joindre des fichiers
+        </button>
         <span style={styles.fileText}>NINEA, RCCM, piece d'identite, justificatifs administratifs.</span>
         {!!files?.length && (
           <div style={styles.fileList}>
@@ -591,7 +630,7 @@ function FileField({ label, error, hint, files, onChange, inputRef }) {
         )}
       </div>
       {error ? <span style={styles.fieldError}>{error}</span> : hint ? <span style={styles.fieldHint}>{hint}</span> : null}
-    </label>
+    </div>
   );
 }
 
@@ -1068,6 +1107,8 @@ const styles = {
     color: "#fff",
     fontWeight: 700,
     fontSize: 13,
+    cursor: "pointer",
+    appearance: "none",
   },
   fileText: {
     fontSize: 12,

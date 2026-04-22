@@ -1,27 +1,60 @@
 stages:
-  - backend
-  - frontend
+  - quality
+  - test
+  - build
   - deploy
 
 variables:
   POSTGRES_DB: carexpress
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: postgres
+  DB_CONNECTION: pgsql
   DB_HOST: postgres
   DB_PORT: 5432
   DB_DATABASE: carexpress
   DB_USERNAME: postgres
   DB_PASSWORD: postgres
+  DB_SSLMODE: disable
+  APP_ENV: testing
+  APP_DEBUG: "false"
+  APP_URL: http://127.0.0.1:8000
+  COMPOSER_CACHE_DIR: "$CI_PROJECT_DIR/.cache/composer"
+  npm_config_cache: "$CI_PROJECT_DIR/.cache/npm"
 
-build-backend:
-  stage: backend
-  image: php:8.3
+default:
+  interruptible: true
+  cache:
+    paths:
+      - .cache/composer
+      - .cache/npm
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+
+backend:quality:
+  stage: quality
+  image: php:8.3-cli
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends unzip git libzip-dev libpq-dev
+    - docker-php-ext-install pdo pdo_pgsql
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+  script:
+    - cd backend-api
+    - composer install --no-interaction --prefer-dist
+    - vendor/bin/pint --test
+
+backend:test:
+  stage: test
+  image: php:8.3-cli
   services:
     - name: postgres:16
       alias: postgres
   before_script:
     - apt-get update
-    - apt-get install -y unzip git libzip-dev libpq-dev
+    - apt-get install -y --no-install-recommends unzip git libzip-dev libpq-dev
     - docker-php-ext-install pdo pdo_pgsql
     - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
   script:
@@ -29,29 +62,80 @@ build-backend:
     - composer install --no-interaction --prefer-dist
     - cp .env.example .env
     - |
-      php -r "file_put_contents('.env', str_replace(
-        ['DB_HOST=127.0.0.1','DB_DATABASE=laravel','DB_USERNAME=root','DB_PASSWORD='],
-        ['DB_HOST=postgres','DB_DATABASE=carexpress','DB_USERNAME=postgres','DB_PASSWORD=postgres'],
-        file_get_contents('.env')));"
+      php -r "file_put_contents('.env', preg_replace(
+        [
+          '/^APP_ENV=.*/m',
+          '/^APP_DEBUG=.*/m',
+          '/^APP_URL=.*/m',
+          '/^DB_CONNECTION=.*/m',
+          '/^DB_HOST=.*/m',
+          '/^DB_PORT=.*/m',
+          '/^DB_DATABASE=.*/m',
+          '/^DB_USERNAME=.*/m',
+          '/^DB_PASSWORD=.*/m',
+          '/^DB_SSLMODE=.*/m'
+        ],
+        [
+          'APP_ENV=testing',
+          'APP_DEBUG=false',
+          'APP_URL=http://127.0.0.1:8000',
+          'DB_CONNECTION=pgsql',
+          'DB_HOST=postgres',
+          'DB_PORT=5432',
+          'DB_DATABASE=carexpress',
+          'DB_USERNAME=postgres',
+          'DB_PASSWORD=postgres',
+          'DB_SSLMODE=disable'
+        ],
+        file_get_contents('.env')
+      ));"
     - php artisan key:generate
     - php artisan migrate --force
     - php artisan test
 
-build-frontend:
-  stage: frontend
+frontend:build:
+  stage: build
   image: node:20
   script:
     - cd carexpress-react
     - npm ci
     - npm run build
   artifacts:
+    expire_in: 7 days
     paths:
       - carexpress-react/dist
 
-deploy:
-  stage: deploy
-  image: alpine:3.18
+docker:build:
+  stage: build
+  image: docker:27
+  services:
+    - name: docker:27-dind
+      alias: docker
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
   script:
-    - echo "Déploiement : configure ton job deploy ici"
-  only:
-    - main
+    - docker build -t carexpress-backend:ci ./backend-api
+    - docker build -t carexpress-frontend:ci ./carexpress-react
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+deploy:production:
+  stage: deploy
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache bash git openssh-client rsync
+    - mkdir -p ~/.ssh
+    - echo "$DEPLOY_SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+  script:
+    - rsync -az --delete --exclude ".git" --exclude "node_modules" --exclude "vendor" ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+    - ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && cp -n .env.docker.example .env || true && docker compose up -d --build"
+  environment:
+    name: production
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DEPLOY_HOST && $DEPLOY_USER && $DEPLOY_PATH && $DEPLOY_SSH_PRIVATE_KEY'
+      when: manual
+    - when: never

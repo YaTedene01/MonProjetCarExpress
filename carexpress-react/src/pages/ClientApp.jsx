@@ -10,6 +10,7 @@ import {
   checkVehicleAvailability,
   createPurchaseRequest,
   createReservation,
+  createVehicleReview,
   fetchCatalogueVehicles,
   fetchClientPurchaseRequests,
   fetchClientReservations,
@@ -17,7 +18,7 @@ import {
 
 const S = COLORS;
 
-export default function ClientApp({ user, chatThreads, sendChatMessage, onLogout, onGoToLanding }) {
+export default function ClientApp({ user, chatThreads, sendChatMessage, openChatThread, onLogout, onGoToLanding }) {
   const [page, setPage] = useState("home");
   const [clientTab, setClientTab] = useState("location");
   const [view, setView] = useState("grid");
@@ -29,6 +30,7 @@ export default function ClientApp({ user, chatThreads, sendChatMessage, onLogout
   const [clientPurchases, setClientPurchases] = useState([]);
   const [locationFilters, setLocationFilters] = useState(null);
   const [saleFilters, setSaleFilters] = useState(null);
+  const [activeMessageThreadId, setActiveMessageThreadId] = useState(null);
 
   const applyLocationFilters = (update) => {
     if (typeof update === "function") {
@@ -63,11 +65,27 @@ export default function ClientApp({ user, chatThreads, sendChatMessage, onLogout
       });
   }, []);
 
-  const locVehicles = useMemo(() => VehicleService.getLocationVehicles(catalogueVehicles), [catalogueVehicles]);
-  const vntVehicles = useMemo(() => VehicleService.getSaleVehicles(catalogueVehicles), [catalogueVehicles]);
+  const allVehiclesWithId = useMemo(() => {
+    const apiVehicles = VehicleService.getAllVehicles(catalogueVehicles);
+    const demoVehicles = VehicleService.getAllVehicles();
+    const apiLocationCount = apiVehicles.filter((vehicle) => vehicle.id.startsWith("loc-")).length;
+    const apiSaleCount = apiVehicles.filter((vehicle) => vehicle.id.startsWith("vnt-")).length;
+    const neededLocationCount = Math.max(0, 6 - apiLocationCount);
+    const neededSaleCount = Math.max(0, 6 - apiSaleCount);
+    const demoLocationVehicles = demoVehicles
+      .filter((vehicle) => vehicle.id.startsWith("loc-"))
+      .slice(0, neededLocationCount);
+    const demoSaleVehicles = demoVehicles
+      .filter((vehicle) => vehicle.id.startsWith("vnt-"))
+      .slice(0, neededSaleCount);
+
+    return [...apiVehicles, ...demoLocationVehicles, ...demoSaleVehicles];
+  }, [catalogueVehicles]);
+
+  const locVehicles = useMemo(() => allVehiclesWithId.filter((vehicle) => vehicle.id.startsWith("loc-")), [allVehiclesWithId]);
+  const vntVehicles = useMemo(() => allVehiclesWithId.filter((vehicle) => vehicle.id.startsWith("vnt-")), [allVehiclesWithId]);
   const filteredLocVehicles = useMemo(() => VehicleService.filterVehicles(locVehicles, locationFilters), [locVehicles, locationFilters]);
   const filteredVntVehicles = useMemo(() => VehicleService.filterVehicles(vntVehicles, saleFilters), [vntVehicles, saleFilters]);
-  const allVehiclesWithId = useMemo(() => VehicleService.getAllVehicles(catalogueVehicles), [catalogueVehicles]);
 
   const navItems = [
     { key: "home", icon: "home", label: "Accueil" },
@@ -80,8 +98,66 @@ export default function ClientApp({ user, chatThreads, sendChatMessage, onLogout
     ? user.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()
     : "CL";
 
-  const detailVehicle = detail ? VehicleService.getVehicleById(detail, catalogueVehicles) : null;
+  const detailVehicle = useMemo(() => {
+    if (!detail) return null;
+
+    const currentVehicle = allVehiclesWithId.find((vehicle) => vehicle.id === detail) || null;
+
+    if (!currentVehicle) {
+      return null;
+    }
+
+    if (!String(currentVehicle.id || "").startsWith("loc-")) {
+      return currentVehicle;
+    }
+
+    const matchingSaleVehicle = allVehiclesWithId.find((vehicle) =>
+      String(vehicle.id || "").startsWith("vnt-")
+      && vehicle.name === currentVehicle.name
+      && vehicle.agency === currentVehicle.agency
+    );
+
+    return {
+      ...currentVehicle,
+      alsoForSale: Boolean(matchingSaleVehicle),
+    };
+  }, [allVehiclesWithId, detail]);
   const isLoc = detail?.startsWith("loc-");
+  const canReviewVehicle = (vehicle) => {
+    if (!vehicle?.backendId) return false;
+
+    const hasEligibleReservation = clientReservations.some((reservation) =>
+      reservation?.vehicle?.id === vehicle.backendId
+      && ["confirmed", "completed"].includes(String(reservation.status || ""))
+      && reservation.return_date
+      && new Date(reservation.return_date) <= new Date()
+    );
+
+    const hasEligiblePurchase = clientPurchases.some((purchase) =>
+      purchase?.vehicle?.id === vehicle.backendId
+      && String(purchase.status || "") === "closed"
+    );
+
+    return hasEligibleReservation || hasEligiblePurchase;
+  };
+  const handleContactAgency = async (vehicle, type) => {
+    if (!openChatThread) return;
+    const threadId = await openChatThread({
+      vehicleId: vehicle.backendId,
+      vehicleName: vehicle.name,
+      agencyName: vehicle.agency,
+      clientName: user?.name || "Client",
+      type,
+    });
+    setActiveMessageThreadId(threadId);
+    setDetail(null);
+    setPage("messages");
+  };
+
+  const handleReviewSubmitted = (updatedVehicle) => {
+    setCatalogueVehicles((current) => current.map((item) => item.id === updatedVehicle.id ? updatedVehicle : item));
+    setNotif({ icon: "⭐", title: "Avis enregistre", msg: "Votre avis a bien ete publie pour ce vehicule." });
+  };
 
   return (
     <div className="container-responsive" style={{ minHeight: "100vh", background: "linear-gradient(180deg, #f7f2ec 0%, #fcfaf7 42%, #f4eee7 100%)", paddingBottom: 92 }}>
@@ -94,10 +170,23 @@ export default function ClientApp({ user, chatThreads, sendChatMessage, onLogout
           onOpenAgency={() => setAgencyProfile(detailVehicle)}
           onNotif={setNotif}
           onCheckAvailability={checkVehicleAvailability}
+          canReview={canReviewVehicle(detailVehicle)}
+          onSubmitReview={async (payload) => {
+            const updatedVehicle = await createVehicleReview(detailVehicle.backendId, payload);
+            handleReviewSubmitted(updatedVehicle);
+          }}
           onCreateReservation={async (payload) => {
             const reservation = await createReservation(payload);
             setClientReservations((current) => [reservation, ...current]);
+            setCatalogueVehicles((current) =>
+              current.map((item) =>
+                item.id === reservation?.vehicle?.id
+                  ? { ...item, status: "rented" }
+                  : item
+              )
+            );
           }}
+          onContactAgency={(vehicle) => handleContactAgency(vehicle, "location")}
         />
       )}
       {detailVehicle && !isLoc && (
@@ -107,13 +196,19 @@ export default function ClientApp({ user, chatThreads, sendChatMessage, onLogout
           onClose={() => setDetail(null)}
           onOpenAgency={() => setAgencyProfile(detailVehicle)}
           onNotif={setNotif}
+          canReview={canReviewVehicle(detailVehicle)}
+          onSubmitReview={async (payload) => {
+            const updatedVehicle = await createVehicleReview(detailVehicle.backendId, payload);
+            handleReviewSubmitted(updatedVehicle);
+          }}
           onCreatePurchaseRequest={async (payload) => {
             const purchaseRequest = await createPurchaseRequest(payload);
             setClientPurchases((current) => [purchaseRequest, ...current]);
           }}
+          onContactAgency={(vehicle) => handleContactAgency(vehicle, "achat")}
         />
       )}
-      {agencyProfile && <AgencyProfilePage vehicle={agencyProfile} onClose={() => setAgencyProfile(null)} />}
+      {agencyProfile && <AgencyProfilePage vehicle={agencyProfile} vehicles={allVehiclesWithId} onClose={() => setAgencyProfile(null)} />}
       {notif && <Notification notif={notif} onClose={() => setNotif(null)} />}
 
       <Topbar
@@ -130,7 +225,7 @@ export default function ClientApp({ user, chatThreads, sendChatMessage, onLogout
       <section className="container-responsive" style={{ maxWidth: 1360, margin: "0 auto", padding: "20px 20px 0" }}>
         {page === "home" && <HomePage clientTab={clientTab} setClientTab={setClientTab} view={view} setView={setView} onOpenDetail={setDetail} locVehicles={filteredLocVehicles} vntVehicles={filteredVntVehicles} onLocationFilterChange={applyLocationFilters} onSaleFilterChange={setSaleFilters} />}
         {page === "search" && <SearchPage onOpenDetail={setDetail} allVehiclesWithId={allVehiclesWithId} />}
-        {page === "messages" && <MessagesPage user={user} chatThreads={chatThreads} sendChatMessage={sendChatMessage} />}
+        {page === "messages" && <MessagesPage user={user} chatThreads={chatThreads} sendChatMessage={sendChatMessage} initialThreadId={activeMessageThreadId} />}
         {page === "profil" && <ProfilPage user={user} avatarInitials={avatarInitials} onLogout={onLogout} reservations={clientReservations} purchases={clientPurchases} />}
       </section>
 
@@ -373,8 +468,8 @@ function SearchPage({ onOpenDetail, allVehiclesWithId }) {
         <div style={{ display: "grid", gap: 14 }}>
           <SearchBox placeholder="Marque, modele, ville ou categorie..." value={q} onChange={setQ} />
           <div style={autoGrid(220, 12)}>
-            <SoftMetric label="Recherches recentes" value="3" sub="sauvegardees pour ce client" />
-            <SoftMetric label="Categories populaires" value="6" sub="acces rapide" />
+            <SoftMetric label="Recherches recentes" value={String(recentSearches.length)} sub="raccourcis disponibles" />
+            <SoftMetric label="Categories populaires" value={String(categories.length)} sub="acces rapide" />
             <SoftMetric label="Resultats actifs" value={String(allVehiclesWithId.length)} sub="location et achat" />
           </div>
         </div>
@@ -411,13 +506,16 @@ function SearchPage({ onOpenDetail, allVehiclesWithId }) {
   );
 }
 
-function MessagesPage({ user, chatThreads, sendChatMessage }) {
+function MessagesPage({ user, chatThreads, sendChatMessage, initialThreadId }) {
+  const agencyMessages = chatThreads.reduce((sum, thread) => sum + thread.messages.filter((item) => item.senderRole === "agency").length, 0);
+  const trackedCases = chatThreads.filter((thread) => thread.messages.length > 0).length;
+
   return (
     <div style={{ display: "grid", gap: 18 }}>
       <div style={autoGrid(220)}>
         <SoftMetric label="Conversations" value={String(chatThreads.length)} sub="avec les agences suivies" />
-        <SoftMetric label="Messages recus" value={String(chatThreads.reduce((sum, thread) => sum + thread.messages.filter((item) => item.senderRole === "agency").length, 0))} sub="reponses partenaires" />
-        <SoftMetric label="Dossiers suivis" value="2" sub="location et achat" />
+        <SoftMetric label="Messages recus" value={String(agencyMessages)} sub="reponses partenaires" />
+        <SoftMetric label="Dossiers suivis" value={String(trackedCases)} sub="location et achat" />
       </div>
 
       <Panel title="Messagerie agence" subtitle="Discutez directement avec l'agence pour confirmer une location ou suivre un dossier achat.">
@@ -430,6 +528,7 @@ function MessagesPage({ user, chatThreads, sendChatMessage }) {
           emptyTitle="Aucune conversation"
           emptySubtitle="Les echanges avec les agences apparaitront ici des qu'une reservation ou une demande d'achat est lancee."
           onSend={sendChatMessage}
+          initialThreadId={initialThreadId}
         />
       </Panel>
     </div>
@@ -438,6 +537,8 @@ function MessagesPage({ user, chatThreads, sendChatMessage }) {
 
 function ProfilPage({ user, avatarInitials, onLogout, reservations, purchases }) {
   const [activeSection, setActiveSection] = useState("Informations personnelles");
+  const publishedReviews = 0;
+  const notificationsCount = reservations.length + purchases.length;
   const menuItems = [
     { icon: "user", label: "Informations personnelles" },
     { icon: "calendar", label: "Mes reservations" },
@@ -483,20 +584,20 @@ function ProfilPage({ user, avatarInitials, onLogout, reservations, purchases })
       title: "Mes avis",
       subtitle: "Vos retours laisses apres location ou achat.",
       items: [
-        { label: "Avis publies", value: "4 avis clients" },
-        { label: "Dernier avis", value: "Toyota Prado · note 4,8/5" },
-        { label: "Agence la mieux notee", value: "Dakar Auto Services" },
-        { label: "Statut", value: "Tous les avis sont visibles" },
+        { label: "Avis publies", value: `${publishedReviews} avis enregistres` },
+        { label: "Dernier avis", value: publishedReviews ? "Dernier avis client disponible" : "Aucun avis publie pour le moment" },
+        { label: "Agences evaluees", value: `${Math.min(publishedReviews, chatThreadsLengthFallback(reservations, purchases))} agence${Math.min(publishedReviews, chatThreadsLengthFallback(reservations, purchases)) > 1 ? "s" : ""}` },
+        { label: "Statut", value: publishedReviews ? "Vos avis sont visibles" : "Vous pourrez noter une agence apres une experience" },
       ],
     },
     "Notifications": {
       title: "Notifications",
       subtitle: "Les alertes importantes reliees a vos dossiers client.",
       items: [
-        { label: "Non lues", value: "2 notifications" },
-        { label: "Derniere alerte", value: "Reservation confirmee · il y a 2 heures" },
-        { label: "Type principal", value: "Reservations et suivi achat" },
-        { label: "Canal actif", value: "Application et telephone" },
+        { label: "Notifications visibles", value: `${notificationsCount} evenement${notificationsCount > 1 ? "s" : ""}` },
+        { label: "Derniere alerte", value: reservations[0]?.status ? `Reservation ${reservations[0].status}` : (purchases[0]?.status ? `Achat ${purchases[0].status}` : "Aucune alerte recente") },
+        { label: "Type principal", value: purchases.length ? "Reservations et suivi achat" : "Reservations" },
+        { label: "Canal actif", value: user?.phone || user?.email ? "Application et coordonnees du compte" : "Application" },
       ],
     },
     "Securite et mot de passe": {
@@ -543,7 +644,7 @@ function ProfilPage({ user, avatarInitials, onLogout, reservations, purchases })
         <div style={{ ...autoGrid(190, 14), marginTop: 18 }}>
           <SoftMetric label="Reservations" value={String(reservations.length)} sub="location effectuees" />
           <SoftMetric label="Achats" value={String(purchases.length)} sub="dossiers lances" />
-          <SoftMetric label="Avis postes" value="4" sub="sur les agences" />
+          <SoftMetric label="Avis postes" value={String(publishedReviews)} sub="sur les agences" />
         </div>
       </Panel>
 
@@ -566,6 +667,10 @@ function ProfilPage({ user, avatarInitials, onLogout, reservations, purchases })
       </Panel>
     </div>
   );
+}
+
+function chatThreadsLengthFallback(reservations, purchases) {
+  return reservations.length + purchases.length;
 }
 
 function Panel({ title, subtitle, right, children, noPadding, dense = false }) {

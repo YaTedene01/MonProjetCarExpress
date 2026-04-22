@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Services\TarificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Str;
 
 class VehicleResource extends JsonResource
 {
@@ -48,12 +49,36 @@ class VehicleResource extends JsonResource
             'location_label' => $this->location_label,
             'rating' => (float) $this->rating,
             'reviews_count' => $this->reviews_count,
-            'gallery' => $this->gallery ?? [],
+            'reviews' => VehicleReviewResource::collection($this->whenLoaded('reviews')),
+            'gallery' => collect($this->gallery ?? [])
+                ->map(fn ($item) => $this->resolveAssetUrl($request, $item))
+                ->filter()
+                ->values()
+                ->all(),
             'specifications' => $this->specifications ?? [],
             'equipment' => $this->equipment ?? [],
             'tags' => $this->tags ?? [],
             'agency' => new AgencyResource($this->whenLoaded('agency')),
             'created_at' => $this->created_at,
         ];
+    }
+
+    private function resolveAssetUrl(Request $request, mixed $value): ?string
+    {
+        $path = trim((string) $value);
+
+        if ($path === '') {
+            return null;
+        }
+
+        if (Str::startsWith($path, ['http://', 'https://', 'blob:'])) {
+            return $path;
+        }
+
+        if (Str::startsWith($path, '/')) {
+            return $request->getSchemeAndHttpHost().$path;
+        }
+
+        return $request->getSchemeAndHttpHost().'/'.ltrim($path, '/');
     }
 }

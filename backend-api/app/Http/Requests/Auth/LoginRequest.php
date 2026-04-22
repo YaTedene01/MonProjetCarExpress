@@ -11,6 +11,16 @@ class LoginRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $identifier = trim((string) $this->input('identifier', ''));
+
+        $this->merge([
+            'identifier' => filter_var($identifier, FILTER_VALIDATE_EMAIL) ? mb_strtolower($identifier) : $identifier,
+            'device_name' => trim((string) $this->input('device_name', '')),
+        ]);
+    }
+
     public function rules(): array
     {
         return [

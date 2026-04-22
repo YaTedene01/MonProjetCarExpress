@@ -20,6 +20,7 @@ export default function App() {
     setAgencyBranding,
     chatThreads,
     sendChatMessage,
+    openChatThread,
     handleGetStarted,
     handleRoleSelect,
     handleBack,
@@ -81,10 +82,17 @@ export default function App() {
         <ModernAdminAuth onLogin={handleAdminLogin} onBack={handleBackToSelect}/>
       )}
       {screen === 'app-client' && (
-        <ClientApp user={user} chatThreads={chatThreads} sendChatMessage={sendChatMessage} agencyBranding={agencyBranding} onLogout={handleClientLogout} onGoToLanding={handleGoToLanding} />
+        <ClientApp user={user} chatThreads={chatThreads} sendChatMessage={sendChatMessage} openChatThread={openChatThread} agencyBranding={agencyBranding} onLogout={handleClientLogout} onGoToLanding={handleGoToLanding} />
       )}
       {screen === 'app-agency' && (
-        <AgencyApp branding={agencyBranding} chatThreads={chatThreads} sendChatMessage={sendChatMessage} onLogout={handleAgencyLogout} onGoToLanding={handleGoToLanding} />
+        <AgencyApp
+          branding={agencyBranding}
+          chatThreads={chatThreads}
+          sendChatMessage={sendChatMessage}
+          openChatThread={openChatThread}
+          onLogout={handleAgencyLogout}
+          onGoToLanding={handleGoToLanding}
+        />
       )}
       {screen === 'app-admin' && (
         <AdminApp

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Agency;
 
+use App\Enums\VehicleStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Agency\UpdatePurchaseRequestStatusRequest;
 use App\Http\Resources\PurchaseRequestResource;
@@ -56,9 +57,25 @@ class PurchaseRequestController extends Controller
     {
         abort_unless($purchaseRequest->agency_id === $request->user()->agency_id, 403);
 
+        $status = $request->string('status')->toString();
+
         $purchaseRequest->update([
-            'status' => $request->string('status')->toString(),
+            'status' => $status,
         ]);
+
+        if ($purchaseRequest->vehicle) {
+            if ($status === 'closed') {
+                $purchaseRequest->vehicle->update([
+                    'status' => VehicleStatus::Sold->value,
+                ]);
+            }
+
+            if ($status === 'cancelled' && ($purchaseRequest->vehicle->listing_type?->value ?? $purchaseRequest->vehicle->listing_type) === 'sale') {
+                $purchaseRequest->vehicle->update([
+                    'status' => VehicleStatus::ForSale->value,
+                ]);
+            }
+        }
 
         return $this->successResponse(
             'Statut de la demande d achat mis a jour.',

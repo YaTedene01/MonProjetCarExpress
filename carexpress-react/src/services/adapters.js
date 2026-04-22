@@ -1,4 +1,16 @@
 import { getPricingDetails } from "../utils/pricing";
+import { getApiBaseUrl } from "./api";
+
+function resolveStorageUrl(path) {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path) || path.startsWith("blob:")) return path;
+  // /storage/... paths must be prefixed with the backend origin, not /api/v1.
+  const base = getApiBaseUrl()
+    .replace(/\/$/, "")
+    .replace(/\/api\/v\d+$/i, "")
+    .replace(/\/api$/i, "");
+  return base ? `${base}${path}` : path;
+}
 
 const imageByKeyword = [
   { keywords: ["land cruiser", "prado"], image: "landcruiser.jpg", emoji: "🚙" },
@@ -35,20 +47,29 @@ export function adaptVehicleForUi(vehicle) {
   const year = vehicle.year || "2026";
   const className = vehicle.class_name || "Standard";
   const mileage = vehicle.mileage ? `${Number(vehicle.mileage).toLocaleString("fr-FR")} km` : "Kilometrage non renseigne";
+  const reviewsCount = Number(vehicle.reviews_count || 0);
+  const ratingValue = Number(vehicle.rating || 0);
+  const availabilityFrom = vehicle.specifications?.available_from || "";
+  const availabilityTo = vehicle.specifications?.available_to || "";
+  const gallery = Array.isArray(vehicle.gallery)
+    ? vehicle.gallery.map((item) => resolveStorageUrl(item)).filter(Boolean)
+    : [];
 
   return {
     ...vehicle,
     id: `${isRental ? "loc" : "vnt"}-${vehicle.id}`,
     backendId: vehicle.id,
     emoji: visual.emoji,
-    image: vehicle.gallery?.[0] || visual.image,
+    image: gallery[0] || visual.image,
+    fallbackImage: visual.image || "",
+    images: gallery,
     name: vehicle.name,
     agency: vehicle.agency?.name || "Agence partenaire",
     price: Number(vehicle.price || 0),
     priceLabel: formatCurrency(vehicle.price),
     priceUnit: isRental ? "F CFA / jour" : "F CFA",
-    stars: toStars(vehicle.rating),
-    rating: `${Number(vehicle.rating || 0).toFixed(1)} (${vehicle.reviews_count || 0} avis)`,
+    stars: reviewsCount > 0 ? toStars(ratingValue) : "",
+    rating: reviewsCount > 0 ? `${ratingValue.toFixed(1)} (${reviewsCount} avis)` : "Aucun avis pour le moment",
     alsoForSale: isRental,
     tags: vehicle.tags?.length
       ? vehicle.tags
@@ -60,6 +81,8 @@ export function adaptVehicleForUi(vehicle) {
       { label: "Transmission", val: vehicle.transmission || "Non renseignee" },
       { label: isRental ? "Annee" : "Kilometrage", val: isRental ? String(year) : mileage },
       { label: "Classe", val: className },
+      ...(isRental && availabilityFrom ? [{ label: "Disponible du", val: availabilityFrom }] : []),
+      ...(isRental && availabilityTo ? [{ label: "Disponible au", val: availabilityTo }] : []),
     ],
     motor: [
       { label: "Carburant", val: vehicle.fuel_type || "Non renseigne" },
@@ -69,19 +92,15 @@ export function adaptVehicleForUi(vehicle) {
     ],
     equip: vehicle.equipment?.length ? vehicle.equipment : ["Climatisation", "Bluetooth", "ABS"],
     desc: vehicle.description || vehicle.summary || "Description non renseignee pour le moment.",
-    reviews: [
-      {
-        name: "Client Car Express",
-        stars: toStars(vehicle.rating || 4),
-        date: "Recemment",
-        text: vehicle.summary || "Vehicule disponible sur Car Express.",
-      },
-    ],
+    reviews: Array.isArray(vehicle.reviews) ? vehicle.reviews : [],
     city: vehicle.city,
     detail: `${vehicle.category || "Vehicule"} · ${isRental ? `${seats} places` : mileage} · ${formatCurrency(vehicle.price)} F${isRental ? " / jour" : ""}`,
     commercialDetail: vehicle.summary || vehicle.description || "",
     type: isRental ? "Location" : "Vente",
     statusLabel: vehicle.status,
+    availabilityBadge: isRental
+      ? (vehicle.status === "rented" ? "Loue" : vehicle.status === "maintenance" ? "Indisponible" : "")
+      : (vehicle.status === "sold" ? "Vendu" : ""),
     transmission: vehicle.transmission || "Automatique",
   };
 }
@@ -89,6 +108,7 @@ export function adaptVehicleForUi(vehicle) {
 export function adaptAgencyVehicleRow(vehicle) {
   const uiVehicle = adaptVehicleForUi(vehicle);
   const statusMap = {
+    pending: "En attente admin",
     available: "Disponible",
     rented: "Loue",
     for_sale: "En vente",
@@ -110,7 +130,7 @@ export function adaptAgencyVehicleRow(vehicle) {
       : `${formatCurrency(vehicle.price)} F / jour`,
     views: vehicle.reviews_count || 0,
     urgent: vehicle.status === "maintenance",
-    images: [uiVehicle.image].filter(Boolean),
+    images: uiVehicle.images?.length ? uiVehicle.images : [uiVehicle.image].filter(Boolean),
     city: vehicle.city,
     transmission: vehicle.transmission || "Automatique",
     raw: vehicle,
@@ -138,6 +158,17 @@ export function adaptAdminAgency(agency) {
     status: statusMap[agency.status] || agency.status,
     docs: [agency.district, agency.address].filter(Boolean).join(" · ") || "Informations administratives enregistrees",
     revenue: `${agency.vehicles_count || 0} vehicule${agency.vehicles_count > 1 ? "s" : ""}`,
+  };
+}
+
+export function adaptAdminAgencyDetail(agency) {
+  const baseAgency = adaptAdminAgency(agency);
+
+  return {
+    ...baseAgency,
+    vehicles: Array.isArray(agency?.vehicles)
+      ? agency.vehicles.map((vehicle) => adaptVehicleForUi(vehicle))
+      : [],
   };
 }
 

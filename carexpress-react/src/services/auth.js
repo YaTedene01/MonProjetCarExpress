@@ -1,4 +1,5 @@
 import { apiRequest, clearSession, readSession, writeSession } from "./api";
+import { createAgencyRequest } from "./agencyRequests";
 
 function buildSession(data, roleOverride) {
   const user = data?.utilisateur || data;
@@ -38,33 +39,36 @@ export async function authenticate(role, formData) {
       { method: "POST", body: JSON.stringify(payload) }
     );
 
+    if (mode === "signup") {
+      return {
+        success: true,
+        requiresLogin: true,
+      };
+    }
+
     const session = buildSession(response.data, "client");
     writeSession(session);
     return session;
   }
 
   if (role === "agency") {
-    const payload = formData.mode === "signup"
-      ? {
-          company: formData.company,
-          phone: formData.phone,
-          email: formData.email,
-          city: formData.city,
-          activity: formData.activity || "Location et vente",
-          password: formData.password,
-          password_confirmation: formData.confirmPassword,
-          device_name: "agency-web",
-        }
-      : {
-          identifier: formData.email,
-          password: formData.password,
-          device_name: "agency-web",
-        };
+    if (formData.mode === "signup") {
+      await createAgencyRequest(formData);
 
-    const response = await apiRequest(
-      formData.mode === "signup" ? "/authentification/agence/inscription" : "/authentification/agence/connexion",
-      { method: "POST", body: JSON.stringify(payload) }
-    );
+      return {
+        success: true,
+        requiresLogin: true,
+      };
+    }
+
+    const response = await apiRequest("/authentification/agence/connexion", {
+      method: "POST",
+      body: JSON.stringify({
+        identifier: formData.email,
+        password: formData.password,
+        device_name: "agency-web",
+      }),
+    });
 
     const session = buildSession(response.data, "agency");
     writeSession(session);
@@ -105,4 +109,3 @@ export async function logout() {
     clearSession();
   }
 }
-

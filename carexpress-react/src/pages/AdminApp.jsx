@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Topbar, BottomNav, ProfileMenuItem, Input, FormField, Select, Btn, Notification } from "../components/UI";
-import { AgencyProfilePage } from "../components/VehicleDetail";
+import { AdminVehicleModerationPage, AgencyProfilePage } from "../components/VehicleDetail";
 import ChatPanel from "../components/ChatPanel";
-import { adaptAdminAgency, adaptAdminUser } from "../services/adapters";
-import { fetchAdminAgencies, fetchAdminDashboard, fetchAdminUsers } from "../services/catalogue";
-import { approveAgencyRequest, downloadAgencyRequestDocument, downloadAgencyRequestDocumentAtUrl, getAgencyRequests, loadAgencyRequestLogo, openAgencyRequestDocument, openAgencyRequestDocumentAtUrl } from "../services/agencyRequests";
+import { adaptAdminAgency, adaptAdminAgencyDetail, adaptAdminUser, adaptVehicleForUi } from "../services/adapters";
+import { approveAdminVehicle, fetchAdminAgency, fetchAdminAgencies, fetchAdminDashboard, fetchAdminUsers } from "../services/catalogue";
+import { approveAgencyRequest, downloadAgencyRequestDocument, downloadAgencyRequestDocumentAtUrl, getAgencyRequest, getAgencyRequests, loadAgencyRequestLogo, openAgencyRequestDocument, openAgencyRequestDocumentAtUrl } from "../services/agencyRequests";
 
 const S = {
   red: "#D40511",
@@ -41,21 +41,6 @@ const users = [
   { name: "Cheikh Ndiaye", tel: "+221 76 321 54 78", role: "Agence", status: "Actif" },
 ];
 
-const txTrend = [
-  { label: "Jan", amount: 28 },
-  { label: "Fev", amount: 34 },
-  { label: "Mar", amount: 46 },
-  { label: "Avr", amount: 42 },
-  { label: "Mai", amount: 54 },
-  { label: "Juin", amount: 62 },
-];
-
-const moderationAlerts = [
-  { label: "Agences a valider", value: 3, tone: "amber" },
-  { label: "Annonces a revoir", value: 5, tone: "red" },
-  { label: "Paiements a verifier", value: 2, tone: "blue" },
-];
-
 const adminAlerts = [
   { type: "Signalement client", title: "Moussa Diallo a signale un retard de restitution", detail: "Toyota Prado 2021 · Ticket prioritaire a traiter avant 18:00", tone: "red" },
   { type: "Action a venir", title: "3 agences attendent une validation KYC", detail: "Verifier les dossiers AutoSud SN, Ndiaye Cars et Saloum Auto", tone: "amber" },
@@ -77,6 +62,10 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
   const [requestActionError, setRequestActionError] = useState("");
   const [requestActionSuccess, setRequestActionSuccess] = useState("");
   const [liveNotif, setLiveNotif] = useState(null);
+  const [agencyProfileLoadingId, setAgencyProfileLoadingId] = useState(null);
+  const [agencyProfileError, setAgencyProfileError] = useState("");
+  const [approvingVehicleId, setApprovingVehicleId] = useState(null);
+  const [selectedModerationVehicle, setSelectedModerationVehicle] = useState(null);
   const hasLoadedRequestsRef = useRef(false);
   const knownRequestIdsRef = useRef(new Set());
 
@@ -115,6 +104,7 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
         title: alert.title,
         detail: alert.message,
         tone: getAdminAlertTone(alert),
+        context: alert.context || null,
       })));
     } else if (!silent) {
       setDashboardAlerts(adminAlerts);
@@ -177,6 +167,99 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
     };
   }, []);
 
+  const handleViewAgency = async (agency) => {
+    if (!agency?.id) return;
+
+    setAgencyProfileError("");
+    setAgencyProfileLoadingId(agency.id);
+
+    try {
+      const agencyDetails = await fetchAdminAgency(agency.id);
+      setSelectedAgency(adaptAdminAgencyDetail(agencyDetails));
+    } catch (error) {
+      setAgencyProfileError(error?.message || "Impossible de charger les annonces de cette agence pour le moment.");
+    } finally {
+      setAgencyProfileLoadingId(null);
+    }
+  };
+
+  const handleApproveVehicle = async (vehicle) => {
+    if (!vehicle?.backendId) return;
+
+    setApprovingVehicleId(vehicle.backendId);
+    setAgencyProfileError("");
+
+    try {
+      const approvedVehicle = await approveAdminVehicle(vehicle.backendId);
+      const adaptedApprovedVehicle = adaptVehicleForUi(approvedVehicle);
+      const nextStatus = approvedVehicle.listing_type === "sale" ? "En vente" : "Disponible";
+
+      setSelectedAgency((current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          vehicles: (current.vehicles || []).map((item) =>
+            item.backendId === vehicle.backendId
+              ? { ...item, ...adaptedApprovedVehicle, statusLabel: approvedVehicle.status, status: nextStatus }
+              : item
+          ),
+        };
+      });
+
+      setSelectedModerationVehicle((current) => {
+        if (!current || current.backendId !== vehicle.backendId) return current;
+
+        return {
+          ...current,
+          ...adaptedApprovedVehicle,
+          statusLabel: approvedVehicle.status,
+          status: nextStatus,
+        };
+      });
+
+      setLiveNotif({
+        icon: "✅",
+        title: "Annonce validee",
+        msg: "L'annonce est maintenant visible par les clients dans le catalogue.",
+      });
+
+      await loadAdminData({ silent: true });
+    } catch (error) {
+      setAgencyProfileError(error?.message || "Impossible de valider cette annonce pour le moment.");
+    } finally {
+      setApprovingVehicleId(null);
+    }
+  };
+
+  const handleOpenVehicleModeration = async (alert) => {
+    const vehicleId = alert?.context?.vehicle_id;
+    const agencyId = alert?.context?.agency_id;
+
+    if (!vehicleId || !agencyId) {
+      return;
+    }
+
+    setAgencyProfileError("");
+    setAgencyProfileLoadingId(agencyId);
+
+    try {
+      const agencyDetails = await fetchAdminAgency(agencyId);
+      const adaptedAgency = adaptAdminAgencyDetail(agencyDetails);
+      const targetVehicle = (adaptedAgency.vehicles || []).find((item) => item.backendId === vehicleId);
+
+      if (!targetVehicle) {
+        throw new Error("Impossible de retrouver cette annonce.");
+      }
+
+      setSelectedModerationVehicle(targetVehicle);
+    } catch (error) {
+      setAgencyProfileError(error?.message || "Impossible de charger cette annonce pour le moment.");
+    } finally {
+      setAgencyProfileLoadingId(null);
+    }
+  };
+
   const unreadAgencyRequests = useMemo(() => agencyRequests.filter((request) => !request.is_read).length, [agencyRequests]);
 
   const handleApproveAgencyRequest = async (requestId) => {
@@ -228,6 +311,20 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
     }
   };
 
+  const handleViewAgencyRequest = async (requestId) => {
+    setRequestActionError("");
+    setRequestActionSuccess("");
+
+    try {
+      const requestDetails = await getAgencyRequest(requestId);
+      setAgencyRequests((current) => current.map((item) => item.id === requestDetails.id ? requestDetails : item));
+      return requestDetails.id;
+    } catch (error) {
+      setRequestActionError(error?.message || "Impossible de charger cette demande agence.");
+      return null;
+    }
+  };
+
   const navItems = [
     { key: "home", icon: "home", label: "Accueil", badge: unreadAgencyRequests > 0 },
     { key: "users", icon: "users", label: "Utilisateurs" },
@@ -239,7 +336,36 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
 
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #f7f2eb 0%, #faf7f3 46%, #f4eee7 100%)", paddingBottom: 92 }}>
-      {selectedAgency && <AgencyProfilePage vehicle={{ agency: selectedAgency.name }} onClose={() => setSelectedAgency(null)} />}
+      {selectedAgency && (
+        <AgencyProfilePage
+          vehicle={{ agency: selectedAgency.name }}
+          vehicles={selectedAgency.vehicles}
+          onClose={() => setSelectedAgency(null)}
+          vehicleActionLoadingId={approvingVehicleId}
+          getVehicleAction={(item) => (
+            item?.statusLabel === "pending"
+              ? {
+                  label: "Valider l'annonce",
+                  tone: "success",
+                  onClick: () => handleApproveVehicle(item),
+                }
+              : null
+          )}
+        />
+      )}
+      {selectedModerationVehicle && (
+        <AdminVehicleModerationPage
+          vehicle={selectedModerationVehicle}
+          onClose={() => setSelectedModerationVehicle(null)}
+          onOpenAgency={async () => {
+            if (!selectedModerationVehicle?.agency_id) return;
+            setSelectedModerationVehicle(null);
+            await handleViewAgency({ id: selectedModerationVehicle.agency_id });
+          }}
+          approving={approvingVehicleId === selectedModerationVehicle.backendId}
+          onApprove={() => handleApproveVehicle(selectedModerationVehicle)}
+        />
+      )}
       {liveNotif && <Notification notif={liveNotif} onClose={() => setLiveNotif(null)} />}
       <Topbar
         badge={{ label: "Super admin", bg: "rgba(17,17,17,0.08)", color: "#17130f" }}
@@ -253,9 +379,9 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
         }}
       />
       <section className="container-responsive" style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 20px 0" }}>
-        {page === "home" && <AdminHome agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} agencyRequestsLoading={agencyRequestsLoading} agencyRequestsError={agencyRequestsError} onRetryAgencyRequests={() => loadAdminData()} onApproveRequest={handleApproveAgencyRequest} approvingRequestId={approvingRequestId} onOpenDocument={handleOpenRequestDocument} onDownloadDocument={handleDownloadRequestDocument} requestActionError={requestActionError} requestActionSuccess={requestActionSuccess} />}
+        {page === "home" && <AdminHome agencyBranding={agencyBranding} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} users={apiUsers} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onAgencyCreated={(agency) => setApiAgencies((current) => [adaptAdminAgency(agency), ...current])} agencyRequests={agencyRequests} agencyRequestsLoading={agencyRequestsLoading} agencyRequestsError={agencyRequestsError} onRetryAgencyRequests={() => loadAdminData()} onApproveRequest={handleApproveAgencyRequest} approvingRequestId={approvingRequestId} onOpenDocument={handleOpenRequestDocument} onDownloadDocument={handleDownloadRequestDocument} requestActionError={requestActionError} requestActionSuccess={requestActionSuccess} onViewAgencyRequest={handleViewAgencyRequest} onOpenVehicleModeration={handleOpenVehicleModeration} />}
         {page === "users" && <AdminUsers adminSearch={adminSearch} setAdminSearch={setAdminSearch} users={apiUsers} agencies={apiAgencies} />}
-        {page === "agences" && <AdminAgences onViewAgency={setSelectedAgency} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} />}
+        {page === "agences" && <AdminAgences onViewAgency={handleViewAgency} adminSearch={adminSearch} setAdminSearch={setAdminSearch} agencies={apiAgencies} viewingAgencyId={agencyProfileLoadingId} viewAgencyError={agencyProfileError} />}
         {page === "messages" && <AdminMessages chatThreads={chatThreads} sendChatMessage={sendChatMessage} />}
         {page === "systeme" && <AdminSysteme />}
         {page === "profil" && <AdminProfil onLogout={onLogout} />}
@@ -265,8 +391,9 @@ export default function AdminApp({ onLogout, onRegisterAgency, agencyBranding, c
   );
 }
 
-function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onAgencyCreated, agencyRequests, agencyRequestsLoading, agencyRequestsError, onRetryAgencyRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument, requestActionError, requestActionSuccess }) {
+function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onAgencyCreated, agencyRequests, agencyRequestsLoading, agencyRequestsError, onRetryAgencyRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument, requestActionError, requestActionSuccess, onViewAgencyRequest, onOpenVehicleModeration }) {
   const [adminTab, setAdminTab] = useState("dashboard");
+  const [selectedRequestId, setSelectedRequestId] = useState(null);
   const pendingAgencyRequests = agencyRequests.filter((request) => request.status === "pending");
 
   return (
@@ -314,7 +441,15 @@ function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, user
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
                   <Chip tone="gold">{request.is_read ? "Consultee" : "Nouvelle"}</Chip>
-                  <button type="button" onClick={() => setAdminTab("register")} style={ghostButtonStyle()}>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const resolvedRequestId = await onViewAgencyRequest?.(request.id);
+                      setSelectedRequestId(resolvedRequestId || request.id);
+                      setAdminTab("register");
+                    }}
+                    style={ghostButtonStyle()}
+                  >
                     Voir la demande
                   </button>
                 </div>
@@ -338,14 +473,30 @@ function AdminHome({ agencyBranding, adminSearch, setAdminSearch, agencies, user
         </div>
       </Panel>
 
-      {adminTab === "dashboard" && <AdminDashboard adminSearch={adminSearch} agencies={agencies} users={users} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} />}
-      {adminTab === "register" && <RegisterAgency agencyRequests={agencyRequests} agencyRequestsLoading={agencyRequestsLoading} agencyRequestsError={agencyRequestsError} onRetryAgencyRequests={onRetryAgencyRequests} onApproveRequest={onApproveRequest} approvingRequestId={approvingRequestId} onOpenDocument={onOpenDocument} onDownloadDocument={onDownloadDocument} requestActionError={requestActionError} requestActionSuccess={requestActionSuccess} />}
+      {adminTab === "dashboard" && <AdminDashboard adminSearch={adminSearch} agencies={agencies} users={users} dashboardMetrics={dashboardMetrics} dashboardAlerts={dashboardAlerts} onOpenVehicleModeration={onOpenVehicleModeration} />}
+      {adminTab === "register" && <RegisterAgency agencyRequests={agencyRequests} agencyRequestsLoading={agencyRequestsLoading} agencyRequestsError={agencyRequestsError} onRetryAgencyRequests={onRetryAgencyRequests} onApproveRequest={onApproveRequest} approvingRequestId={approvingRequestId} onOpenDocument={onOpenDocument} onDownloadDocument={onDownloadDocument} requestActionError={requestActionError} requestActionSuccess={requestActionSuccess} selectedRequestId={selectedRequestId} />}
       {adminTab === "manage" && <ManageAgencies />}
     </div>
   );
 }
 
-function AdminDashboard({ adminSearch, agencies, users, dashboardMetrics, dashboardAlerts }) {
+function AdminDashboard({ adminSearch, agencies, users, dashboardMetrics, dashboardAlerts, onOpenVehicleModeration }) {
+  const activeUsers = users.filter((user) => user.status === "Actif").length;
+  const inactiveUsers = users.filter((user) => user.status !== "Actif").length;
+  const activeAgencies = agencies.filter((agency) => agency.status === "Active").length;
+  const pendingAgencies = agencies.filter((agency) => agency.status === "En attente").length;
+  const totalTransactions = (dashboardMetrics?.reservations_count || 0) + (dashboardMetrics?.purchase_requests_count || 0);
+  const txTrend = [
+    { label: "Users", amount: Math.min(100, users.length * 5) },
+    { label: "Agences", amount: Math.min(100, (dashboardMetrics?.agencies_count || agencies.length) * 10) },
+    { label: "Resa", amount: Math.min(100, (dashboardMetrics?.reservations_count || 0) * 10) },
+    { label: "Achats", amount: Math.min(100, (dashboardMetrics?.purchase_requests_count || 0) * 10) },
+  ];
+  const moderationAlerts = [
+    { label: "Agences a valider", value: pendingAgencies, tone: "amber" },
+    { label: "Utilisateurs inactifs", value: inactiveUsers, tone: "red" },
+    { label: "Transactions", value: totalTransactions, tone: "blue" },
+  ];
   const quickResults = useMemo(() => {
     const q = adminSearch.trim().toLowerCase();
     if (!q) return [];
@@ -361,10 +512,10 @@ function AdminDashboard({ adminSearch, agencies, users, dashboardMetrics, dashbo
   return (
     <div style={{ display: "grid", gap: 18 }}>
       <div style={autoGrid(220)}>
-        <MetricCard label="Utilisateurs" value={String(dashboardMetrics?.users_count ?? users.length)} sub="+18 aujourd'hui" accent={S.red} />
-        <MetricCard label="Agences actives" value={String(dashboardMetrics?.active_agencies_count ?? agencies.filter((agency) => agency.status === "Active").length)} sub="structures actives" accent={S.black} />
+        <MetricCard label="Utilisateurs" value={String(dashboardMetrics?.users_count ?? users.length)} sub={`${activeUsers} comptes actifs`} accent={S.red} />
+        <MetricCard label="Agences actives" value={String(dashboardMetrics?.active_agencies_count ?? activeAgencies)} sub={`${pendingAgencies} en attente`} accent={S.black} />
         <MetricCard label="Annonces en ligne" value={String(dashboardMetrics?.vehicles_count ?? 0)} sub="location et vente" accent={S.amber} />
-        <MetricCard label="Volume transactions" value={String((dashboardMetrics?.reservations_count || 0) + (dashboardMetrics?.purchase_requests_count || 0))} sub="operations enregistrees" accent={S.success} />
+        <MetricCard label="Volume transactions" value={String(totalTransactions)} sub="operations enregistrees" accent={S.success} />
       </div>
 
       <div style={dashboardGrid()}>
@@ -375,9 +526,9 @@ function AdminDashboard({ adminSearch, agencies, users, dashboardMetrics, dashbo
         <Panel title="Vision globale" subtitle="Lecture par pole metier">
           <SplitStats
             items={[
-              { label: "Clients actifs", value: "1 018", pct: 82, color: S.red },
-              { label: "Agences operationnelles", value: "34", pct: 74, color: S.black },
-              { label: "Annonces conformes", value: "92%", pct: 92, color: S.success },
+              { label: "Clients actifs", value: String(activeUsers), pct: users.length ? Math.round((activeUsers / users.length) * 100) : 0, color: S.red },
+              { label: "Agences operationnelles", value: String(activeAgencies), pct: agencies.length ? Math.round((activeAgencies / agencies.length) * 100) : 0, color: S.black },
+              { label: "Annonces en ligne", value: String(dashboardMetrics?.vehicles_count ?? 0), pct: Math.min(100, (dashboardMetrics?.vehicles_count || 0) * 10), color: S.success },
             ]}
           />
         </Panel>
@@ -395,7 +546,7 @@ function AdminDashboard({ adminSearch, agencies, users, dashboardMetrics, dashbo
         <Panel title="Centre d'alertes" subtitle="Signalements clients, actions a venir et echeances">
           <div style={{ display: "grid", gap: 10 }}>
             {dashboardAlerts.map((alert) => (
-              <AdminAlertCard key={alert.title} alert={alert} />
+              <AdminAlertCard key={`${alert.title}-${alert.detail}`} alert={alert} onOpenVehicleModeration={onOpenVehicleModeration} />
             ))}
           </div>
         </Panel>
@@ -443,6 +594,7 @@ function AdminDashboard({ adminSearch, agencies, users, dashboardMetrics, dashbo
 
 function getAdminAlertTone(alert) {
   const type = alert?.context?.type;
+  if (type === "vehicle_pending_approval") return "amber";
   if (type === "purchase_service_fee_paid") return "blue";
   if (type === "purchase_request_created") return "amber";
   return "red";
@@ -450,6 +602,7 @@ function getAdminAlertTone(alert) {
 
 function getAdminAlertType(alert) {
   const type = alert?.context?.type;
+  if (type === "vehicle_pending_approval") return "Annonce a valider";
   if (type === "purchase_service_fee_paid") return "Frais de service";
   if (type === "purchase_request_created") return "Demande d'achat";
   return "Notification";
@@ -479,7 +632,8 @@ function getDocumentLabel(document) {
   return extension || "FICHIER";
 }
 
-function RegisterAgency({ agencyRequests, agencyRequestsLoading, agencyRequestsError, onRetryAgencyRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument, requestActionError, requestActionSuccess }) {
+function RegisterAgency({ agencyRequests, agencyRequestsLoading, agencyRequestsError, onRetryAgencyRequests, onApproveRequest, approvingRequestId, onOpenDocument, onDownloadDocument, requestActionError, requestActionSuccess, selectedRequestId }) {
+  const selectedRequestRef = useRef(null);
   const sortedRequests = useMemo(() => {
     const requests = [...(agencyRequests || [])];
     const priority = { pending: 0, approved: 1, rejected: 2 };
@@ -495,6 +649,17 @@ function RegisterAgency({ agencyRequests, agencyRequestsLoading, agencyRequestsE
       return new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime();
     });
   }, [agencyRequests]);
+
+  useEffect(() => {
+    if (!selectedRequestId || !selectedRequestRef.current) {
+      return;
+    }
+
+    selectedRequestRef.current.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [selectedRequestId, sortedRequests]);
 
   return (
     <Panel title="Enregistrer une agence" subtitle="Demandes recues et statut d'enregistrement">
@@ -526,12 +691,26 @@ function RegisterAgency({ agencyRequests, agencyRequestsLoading, agencyRequestsE
               {sortedRequests.map((request) => {
                 const isApproved = request.status === "approved";
                 const isPending = request.status === "pending";
+                const isSelected = selectedRequestId === request.id;
 
                 return (
-                <div key={request.id} style={{ padding: "12px 14px", borderRadius: 16, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.76)" }}>
+                <div
+                  key={request.id}
+                  ref={isSelected ? selectedRequestRef : null}
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: 16,
+                    border: `1px solid ${isSelected ? "rgba(212,5,17,0.28)" : S.border}`,
+                    background: isSelected ? "rgba(212,5,17,0.06)" : "rgba(255,255,255,0.76)",
+                    boxShadow: isSelected ? "0 12px 28px rgba(212,5,17,0.08)" : "none",
+                  }}
+                >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                     <div style={{ fontWeight: 700, color: S.text }}>{request.company}</div>
-                    <Chip tone={isApproved ? "green" : "gold"}>{isApproved ? "Agence enregistree" : "En attente"}</Chip>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      {isSelected ? <Chip tone="red">Demande ouverte</Chip> : null}
+                      <Chip tone={isApproved ? "green" : "gold"}>{isApproved ? "Agence enregistree" : "En attente"}</Chip>
+                    </div>
                   </div>
 
                   <div style={{ marginTop: 10, display: "grid", gap: 5, fontSize: 13, color: S.text3, lineHeight: 1.6 }}>
@@ -737,13 +916,16 @@ function AdminUsers({ adminSearch, setAdminSearch, users, agencies }) {
     if (!q) return users;
     return users.filter((user) => `${user.name} ${user.tel} ${user.role} ${user.status}`.toLowerCase().includes(q));
   }, [adminSearch]);
+  const activeUsers = users.filter((user) => user.status === "Actif").length;
+  const inactiveUsers = users.filter((user) => user.status !== "Actif").length;
+  const agencyUsers = users.filter((user) => user.role === "Agence").length;
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
       <div style={autoGrid(210)}>
-        <SoftMetric label="Utilisateurs actifs" value="1 018" sub="clients et partenaires" />
-        <SoftMetric label="Comptes inactifs" value="222" sub="a relancer ou nettoyer" />
-        <SoftMetric label="Agences dans la liste" value="34" sub="visibles dans la plateforme" />
+        <SoftMetric label="Utilisateurs actifs" value={String(activeUsers)} sub="clients et partenaires" />
+        <SoftMetric label="Comptes inactifs" value={String(inactiveUsers)} sub="a relancer ou nettoyer" />
+        <SoftMetric label="Comptes agence" value={String(agencyUsers || agencies.length)} sub="visibles dans la plateforme" />
       </div>
 
       <Panel title="Recherche utilisateurs" subtitle="Filtrez la liste des comptes en temps reel">
@@ -780,7 +962,7 @@ function AdminUsers({ adminSearch, setAdminSearch, users, agencies }) {
   );
 }
 
-function AdminAgences({ onViewAgency, adminSearch, setAdminSearch, agencies }) {
+function AdminAgences({ onViewAgency, adminSearch, setAdminSearch, agencies, viewingAgencyId, viewAgencyError }) {
   const [filter, setFilter] = useState("Tous");
 
   const filtered = useMemo(() => {
@@ -793,6 +975,12 @@ function AdminAgences({ onViewAgency, adminSearch, setAdminSearch, agencies }) {
     }
     return results;
   }, [filter, adminSearch]);
+  const activeAgencies = agencies.filter((agency) => agency.status === "Active").length;
+  const pendingAgencies = agencies.filter((agency) => agency.status === "En attente").length;
+  const totalVehicles = agencies.reduce((sum, agency) => {
+    const match = String(agency.revenue || "").match(/^(\d+)/);
+    return sum + Number(match?.[1] || 0);
+  }, 0);
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
@@ -804,9 +992,9 @@ function AdminAgences({ onViewAgency, adminSearch, setAdminSearch, agencies }) {
         </div>
 
         <div style={autoGrid(200, 14)}>
-          <SoftMetric label="Actives" value="31" sub="operationnelles" />
-          <SoftMetric label="En attente" value="3" sub="a verifier" />
-          <SoftMetric label="Volume moyen" value="1,1 M F" sub="revenu mensuel par agence" />
+          <SoftMetric label="Actives" value={String(activeAgencies)} sub="operationnelles" />
+          <SoftMetric label="En attente" value={String(pendingAgencies)} sub="a verifier" />
+          <SoftMetric label="Vehicules suivis" value={String(totalVehicles)} sub="dans les agences listees" />
         </div>
       </Panel>
 
@@ -819,6 +1007,11 @@ function AdminAgences({ onViewAgency, adminSearch, setAdminSearch, agencies }) {
       </Panel>
 
       <Panel title="Liste des agences" subtitle="Vue metier plus lisible avec statut, ville et volume">
+          {viewAgencyError ? (
+            <div style={{ marginBottom: 14, padding: "12px 14px", borderRadius: 14, border: "1px solid rgba(212,5,17,0.22)", background: "rgba(212,5,17,0.08)", color: S.red, fontSize: 13, lineHeight: 1.6 }}>
+              {viewAgencyError}
+            </div>
+          ) : null}
           <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", minWidth: "min(780px, 100%)", borderCollapse: "collapse" }}>
             <thead>
@@ -843,15 +1036,15 @@ function AdminAgences({ onViewAgency, adminSearch, setAdminSearch, agencies }) {
                       onClick={() => {
                         if (agency.status === "Active") onViewAgency(agency);
                       }}
-                      disabled={agency.status !== "Active"}
+                      disabled={agency.status !== "Active" || viewingAgencyId === agency.id}
                       title={agency.status === "Active" ? "Voir l'agence" : "Disponible apres la premiere connexion de l'agence"}
                       style={{
                         ...ghostButtonStyle(),
-                        opacity: agency.status === "Active" ? 1 : 0.45,
-                        cursor: agency.status === "Active" ? "pointer" : "not-allowed",
+                        opacity: agency.status === "Active" && viewingAgencyId !== agency.id ? 1 : 0.45,
+                        cursor: agency.status === "Active" && viewingAgencyId !== agency.id ? "pointer" : "not-allowed",
                       }}
                     >
-                      Voir
+                      {viewingAgencyId === agency.id ? "Chargement..." : "Voir"}
                     </button>
                   </td>
                 </tr>
@@ -1063,12 +1256,13 @@ function MetricCard({ label, value, sub, accent }) {
   );
 }
 
-function AdminAlertCard({ alert }) {
+function AdminAlertCard({ alert, onOpenVehicleModeration }) {
   const tone = alert.tone === "amber"
     ? { bg: S.amberSoft, color: "#8f6b00", dot: S.amber }
     : alert.tone === "blue"
       ? { bg: S.blueSoft, color: S.blue, dot: S.blue }
       : { bg: S.redSoft, color: S.red, dot: S.red };
+  const isVehicleModerationAlert = alert?.context?.type === "vehicle_pending_approval";
 
   return (
     <div style={{ padding: "14px 16px", borderRadius: 18, border: `1px solid ${S.border}`, background: "rgba(255,255,255,0.82)" }}>
@@ -1078,6 +1272,13 @@ function AdminAlertCard({ alert }) {
       </div>
       <div style={{ fontSize: 14, fontWeight: 700, color: S.text }}>{alert.title}</div>
       <div style={{ marginTop: 6, fontSize: 13, color: S.text2, lineHeight: 1.6 }}>{alert.detail}</div>
+      {isVehicleModerationAlert ? (
+        <div style={{ marginTop: 10 }}>
+          <button type="button" onClick={() => onOpenVehicleModeration?.(alert)} style={ghostButtonStyle()}>
+            Voir la publication complete
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

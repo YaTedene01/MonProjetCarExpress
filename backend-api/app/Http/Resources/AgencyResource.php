@@ -4,12 +4,15 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Http\Resources\MissingValue;
 use Illuminate\Support\Str;
 
 class AgencyResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $vehicles = $this->whenLoaded('vehicles');
+
         return [
             'id' => $this->id,
             'name' => $this->name,
@@ -24,6 +27,9 @@ class AgencyResource extends JsonResource
             'logo_url' => $this->resolveAssetUrl($request, $this->logo_url),
             'status' => $this->status?->value ?? $this->status,
             'vehicles_count' => $this->whenCounted('vehicles'),
+            'vehicles' => $vehicles instanceof MissingValue
+                ? $vehicles
+                : VehicleResource::collection($vehicles),
             'metadata' => $this->metadata,
             'created_at' => $this->created_at,
         ];

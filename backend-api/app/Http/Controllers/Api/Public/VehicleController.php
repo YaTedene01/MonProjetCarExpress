@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\VehicleResource;
 use App\Models\Reservation;
 use App\Models\Vehicle;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
@@ -34,7 +35,7 @@ class VehicleController extends Controller
     public function listCatalogueVehicles(Request $request): JsonResponse
     {
         $vehicles = Vehicle::query()
-            ->with('agency')
+            ->with(['agency', 'reviews.client'])
             ->when(
                 ! $request->filled('status'),
                 function ($query): void {
@@ -43,7 +44,7 @@ class VehicleController extends Controller
                             ->where(function ($rentalQuery): void {
                                 $rentalQuery
                                     ->where('listing_type', 'rental')
-                                    ->where('status', 'available');
+                                    ->whereIn('status', ['available', 'rented']);
                             })
                             ->orWhere(function ($saleQuery): void {
                                 $saleQuery
@@ -102,9 +103,11 @@ class VehicleController extends Controller
     )]
     public function showCatalogueVehicle(Vehicle $vehicle): JsonResponse
     {
+        abort_unless($this->isPubliclyVisible($vehicle), 404);
+
         return $this->successResponse(
             'Vehicule recupere avec succes.',
-            new VehicleResource($vehicle->load('agency'))
+            new VehicleResource($vehicle->load(['agency', 'reviews.client']))
         );
     }
 
@@ -145,10 +148,23 @@ class VehicleController extends Controller
     )]
     public function checkCatalogueVehicleAvailability(Request $request, Vehicle $vehicle): JsonResponse
     {
+        abort_unless($this->isPubliclyVisible($vehicle), 404);
+
         $validated = $request->validate([
             'pickup_date' => ['required', 'date'],
             'return_date' => ['required', 'date', 'after:pickup_date'],
         ]);
+
+        $availabilityWindow = $this->extractAvailabilityWindow($vehicle);
+        $withinAgencyWindow = true;
+
+        if ($availabilityWindow['from'] !== null && Carbon::parse($validated['pickup_date'])->lt($availabilityWindow['from'])) {
+            $withinAgencyWindow = false;
+        }
+
+        if ($availabilityWindow['to'] !== null && Carbon::parse($validated['return_date'])->gt($availabilityWindow['to'])) {
+            $withinAgencyWindow = false;
+        }
 
         $overlap = Reservation::query()
             ->where('vehicle_id', $vehicle->id)
@@ -162,11 +178,59 @@ class VehicleController extends Controller
             'message' => 'Disponibilite verifiee avec succes.',
             'data' => [
                 'vehicle_id' => $vehicle->id,
-                'available' => ! $overlap,
+                'available' => ! $overlap && $withinAgencyWindow,
                 'pickup_date' => $validated['pickup_date'],
                 'return_date' => $validated['return_date'],
+                'available_from' => $availabilityWindow['from']?->toDateString(),
+                'available_to' => $availabilityWindow['to']?->toDateString(),
             ],
         ]);
+    }
+
+    private function extractAvailabilityWindow(Vehicle $vehicle): array
+    {
+        $specifications = $vehicle->specifications;
+
+        if (! is_array($specifications)) {
+            return ['from' => null, 'to' => null];
+        }
+
+        $from = $specifications['available_from'] ?? null;
+        $to = $specifications['available_to'] ?? null;
+
+        return [
+            'from' => $this->parseDateOrNull($from),
+            'to' => $this->parseDateOrNull($to),
+        ];
+    }
+
+    private function parseDateOrNull(mixed $value): ?Carbon
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->startOfDay();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function isPubliclyVisible(Vehicle $vehicle): bool
+    {
+        $listingType = $vehicle->listing_type?->value ?? $vehicle->listing_type;
+        $status = $vehicle->status?->value ?? $vehicle->status;
+
+        if ($listingType === 'rental') {
+            return in_array($status, ['available', 'rented'], true);
+        }
+
+        if ($listingType === 'sale') {
+            return $status === 'for_sale';
+        }
+
+        return false;
     }
 
     #[OA\Get(

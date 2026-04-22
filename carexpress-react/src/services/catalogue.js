@@ -52,6 +52,15 @@ export async function fetchClientPurchaseRequests() {
   return response.data || [];
 }
 
+export async function createVehicleReview(vehicleId, payload) {
+  const response = await apiRequest(`/client/vehicules/${vehicleId}/avis`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  return response.data;
+}
+
 export async function fetchAgencyDashboard() {
   const response = await apiRequest("/agence/tableau-de-bord");
   return response.data || {};
@@ -70,12 +79,23 @@ export async function fetchAgencyVehicles() {
 export async function createAgencyVehicle(payload) {
   const response = await apiRequest("/agence/vehicules", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: payload instanceof FormData ? payload : JSON.stringify(payload),
   });
   return response.data;
 }
 
 export async function updateAgencyVehicle(vehicleId, payload) {
+  // PHP/Laravel ne parse pas multipart/form-data pour les requêtes PUT.
+  // On utilise le method spoofing Laravel (_method=PUT via POST) pour les FormData.
+  if (payload instanceof FormData) {
+    payload.append("_method", "PUT");
+    const response = await apiRequest(`/agence/vehicules/${vehicleId}`, {
+      method: "POST",
+      body: payload,
+    });
+    return response.data;
+  }
+
   const response = await apiRequest(`/agence/vehicules/${vehicleId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
@@ -98,10 +118,22 @@ export async function fetchAdminAgencies() {
   return response.data || [];
 }
 
+export async function fetchAdminAgency(agencyId) {
+  const response = await apiRequest(`/administration/agences/${agencyId}`);
+  return response.data || null;
+}
+
 export async function createAdminAgency(payload) {
   const response = await apiRequest("/administration/agences", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+  return response.data;
+}
+
+export async function approveAdminVehicle(vehicleId) {
+  const response = await apiRequest(`/administration/vehicules/${vehicleId}/valider`, {
+    method: "PATCH",
   });
   return response.data;
 }

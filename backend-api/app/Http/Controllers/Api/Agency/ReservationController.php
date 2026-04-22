@@ -2,16 +2,22 @@
 
 namespace App\Http\Controllers\Api\Agency;
 
+use App\Enums\VehicleStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Agency\UpdateReservationStatusRequest;
 use App\Http\Resources\ReservationResource;
 use App\Models\Reservation;
+use App\Repository\ReservationRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
 class ReservationController extends Controller
 {
+    public function __construct(
+        private readonly ReservationRepository $reservations
+    ) {}
+
     #[OA\Get(
         path: '/api/v1/agence/reservations',
         tags: ['Agence'],
@@ -56,9 +62,31 @@ class ReservationController extends Controller
     {
         abort_unless($reservation->agency_id === $request->user()->agency_id, 403);
 
+        $status = $request->string('status')->toString();
+
         $reservation->update([
-            'status' => $request->string('status')->toString(),
+            'status' => $status,
         ]);
+
+        $vehicle = $reservation->vehicle;
+
+        if ($vehicle) {
+            if (in_array($status, ['pending', 'confirmed'], true)) {
+                $vehicle->update([
+                    'status' => VehicleStatus::Rented->value,
+                ]);
+            }
+
+            if (in_array($status, ['completed', 'cancelled', 'rejected'], true)) {
+                $stillReserved = $this->reservations->hasActiveReservationForVehicle($vehicle->id, $reservation->id);
+
+                if (! $stillReserved) {
+                    $vehicle->update([
+                        'status' => VehicleStatus::Available->value,
+                    ]);
+                }
+            }
+        }
 
         return $this->successResponse(
             'Statut de la reservation mis a jour.',

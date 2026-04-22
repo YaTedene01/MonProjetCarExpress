@@ -24,6 +24,7 @@ Le projet repose sur une architecture full-stack simple à lancer en local:
 - [Comptes de démonstration](#comptes-de-démonstration)
 - [Commandes utiles](#commandes-utiles)
 - [Déploiement](#déploiement)
+- [Versionning Et CI/CD](#versionning-et-cicd)
 - [Documentation complémentaire](#documentation-complémentaire)
 
 ## Fonctionnalités
@@ -35,7 +36,9 @@ Le projet repose sur une architecture full-stack simple à lancer en local:
 - Demandes d'achat côté client
 - Gestion des véhicules, réservations et demandes d'achat côté agence
 - Workflow agence avec demande d'enregistrement, validation admin, première connexion puis activation du compte
+- Demande agence avec envoi de logo et de plusieurs documents justificatifs
 - Boutons et accès d'administration conditionnés par le statut réel de l'agence
+- Modération des annonces agence: une annonce publiée par l'agence doit être validée par l'admin avant d'être visible côté client
 - Tarification centralisée pour les annonces de location et d'achat, avec calcul automatique de la part administration
 - Affichage des conditions et tarifications côté agence avant l'envoi d'une demande
 - Documentation API OpenAPI / Swagger
@@ -51,11 +54,19 @@ Le projet repose sur une architecture full-stack simple à lancer en local:
 ### Cycle de vie d'une agence
 
 - Une agence peut envoyer une demande d'enregistrement avec ses informations administratives, son logo, ses documents et son mot de passe
+- L'admin peut ouvrir une demande, voir directement le logo et les fichiers joints, puis télécharger les pièces si nécessaire
 - Quand l'admin enregistre cette demande, les informations de l'agence créée reprennent celles transmises dans la demande
 - Après enregistrement par l'admin, l'agence reste en statut `pending`
 - Le statut passe à `active` lors de la première connexion réussie de l'agence
 - Tant qu'une agence n'a pas encore effectué cette première connexion, le bouton `Voir` côté admin reste désactivé
 - Tant qu'une agence n'a pas encore créé d'annonces, son espace agence n'affiche aucun véhicule
+
+### Cycle de vie d'une annonce agence
+
+- Quand une agence publie une annonce, celle-ci est créée en statut `pending`
+- L'admin reçoit une alerte de modération pour cette nouvelle annonce
+- Tant que l'admin n'a pas validé l'annonce, elle n'est pas visible dans le catalogue client
+- Après validation admin, une annonce de location passe en `available` et une annonce de vente passe en `for_sale`
 
 ### Tarification agence
 
@@ -235,6 +246,15 @@ Comptes présents dans les seeders:
 - Client: `client@carexpress.sn` / `client12345`
 - Agence: `agency+dakar-auto-services@carexpress.sn` / `agency12345`
 
+Connexion admin dans l'interface:
+
+- Email: `admin@carexpress.sn`
+- Mot de passe: `admin12345`
+- Code 2FA à saisir dans le formulaire: `123456`
+
+Note:
+- le champ `Code 2FA` est actuellement utilisé côté interface de démonstration pour accéder à l'espace super admin
+
 Compte provisoire créé par l'admin:
 
 - lorsqu'une agence est enregistrée manuellement depuis l'espace admin, un compte partenaire est créé avec le mot de passe provisoire `agency12345`
@@ -281,6 +301,25 @@ docker compose up -d --build
 ```
 
 Pour une mise en production, placez idéalement un reverse proxy TLS devant la stack pour gérer HTTPS.
+
+## Versionning Et CI/CD
+
+Le dépôt inclut maintenant une intégration `GitLab CI/CD` via [`.gitlab-ci.yml`](/home/ya-tedene/Téléchargements/MonProjetCarExpress/.gitlab-ci.yml).
+
+Pipeline actuellement en place:
+
+- `backend:quality`
+  exécute `Laravel Pint` pour le contrôle qualité PHP
+- `backend:test`
+  lance les migrations puis les tests Laravel avec PostgreSQL
+- `frontend:build`
+  compile le frontend React avec `npm run build`
+- `docker:build`
+  vérifie que les images Docker backend et frontend se construisent
+- `deploy:production`
+  job manuel de déploiement depuis `main` si les variables SSH sont configurées
+
+Le détail complet de la stratégie de déploiement, de versionning et de CI/CD est documenté dans [DEPLOYMENT.md](/home/ya-tedene/Téléchargements/MonProjetCarExpress/DEPLOYMENT.md).
 
 ## Documentation complémentaire
 

@@ -112,6 +112,10 @@ class AuthService
 
     public function connecter(array $data): array
     {
+        if ($data['role'] === UserRole::Admin->value) {
+            $this->ensureDefaultAdminExists($data['identifier'] ?? null);
+        }
+
         $user = $this->users->findByRoleAndIdentifier($data['role'], $data['identifier']);
 
         if (! $user || ! Hash::check($data['password'], $user->password)) {
@@ -157,6 +161,29 @@ class AuthService
             'utilisateur' => $this->safeLoadAgency($user),
             'token' => $user->createToken($data['device_name'] ?? 'web-app')->plainTextToken,
         ];
+    }
+
+    private function ensureDefaultAdminExists(?string $identifier): void
+    {
+        $normalizedIdentifier = mb_strtolower(trim((string) $identifier));
+
+        if ($normalizedIdentifier !== 'admin@carexpress.sn') {
+            return;
+        }
+
+        if ($this->users->findByEmail($normalizedIdentifier)) {
+            return;
+        }
+
+        $this->users->create([
+            'role' => UserRole::Admin,
+            'name' => 'Car Express Admin',
+            'email' => $normalizedIdentifier,
+            'phone' => '+221770001111',
+            'city' => 'Dakar',
+            'password' => 'admin12345',
+            'status' => 'active',
+        ]);
     }
 
     private function genererNomParDefautDepuisIdentifiants(string $email, string $phone): string

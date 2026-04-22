@@ -79,4 +79,9 @@ class Vehicle extends Model
     {
         return $this->hasMany(PurchaseRequest::class);
     }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(VehicleReview::class)->latest();
+    }
 }

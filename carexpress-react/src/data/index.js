@@ -54,6 +54,28 @@ export const vehicles = {
     tags:['Minibus · 2019','14 places','Gazoil','Manuelle'],
     reviews:[{name:'Serigne M.',stars:'★★★★★',date:'14 mars 2026',text:'Parfait pour le Magal ! Excellent état.'}]
   },
+  'loc-6': {
+    emoji:'🚘', name:'Peugeot 3008', agency:'MobileCar · Dakar',
+    image:'3008.png',
+    price:95000, priceLabel:'95 000', priceUnit:'F CFA / jour', stars:'★★★★☆', rating:'4.6 (16 avis)', alsoForSale:true,
+    specs:[{label:'Sièges',val:'5 places'},{label:'Portes',val:'5 portes'},{label:'Catégorie',val:'SUV'},{label:'Transmission',val:'Automatique'},{label:'Année',val:'2022'},{label:'Classe',val:'Confort'}],
+    motor:[{label:'Carburant',val:'Essence'},{label:'Cylindrée',val:'1 600 cm³'},{label:'Conso.',val:'6,9 L/100km'},{label:'Puissance',val:'180 ch'}],
+    equip:['Climatisation','Caméra recul','Apple CarPlay','Toit panoramique','GPS','Jantes 18"','ABS'],
+    desc:'Peugeot 3008 finition confort, idéale pour les déplacements premium en ville comme sur route. Couleur : Gris graphite.',
+    tags:['SUV · 2022','5 places','Essence','Auto'],
+    reviews:[{name:'Aminata P.',stars:'★★★★★',date:'18 mars 2026',text:'Très belle voiture, silencieuse et confortable.'}]
+  },
+  'loc-7': {
+    emoji:'🚗', name:'Renault Clio', agency:'Auto Plus SN · Dakar',
+    image:'clio.png',
+    price:42000, priceLabel:'42 000', priceUnit:'F CFA / jour', stars:'★★★★☆', rating:'4.1 (13 avis)', alsoForSale:false,
+    specs:[{label:'Sièges',val:'5 places'},{label:'Portes',val:'5 portes'},{label:'Catégorie',val:'Citadine'},{label:'Transmission',val:'Manuelle'},{label:'Année',val:'2021'},{label:'Classe',val:'Éco'}],
+    motor:[{label:'Carburant',val:'Essence'},{label:'Cylindrée',val:'1 200 cm³'},{label:'Conso.',val:'5,4 L/100km'},{label:'Puissance',val:'90 ch'}],
+    equip:['Climatisation','Bluetooth','USB','ABS','Direction assistée'],
+    desc:'Renault Clio pratique et économique, parfaite pour la ville et les petits trajets. Couleur : Bleu nuit.',
+    tags:['Citadine · 2021','5 places','Essence','Manuelle'],
+    reviews:[{name:'Ndeye T.',stars:'★★★★☆',date:'11 mars 2026',text:'Très bon choix pour circuler à Dakar sans se ruiner.'}]
+  },
   'vnt-1': {
     emoji:'🚗', name:'Renault Clio', agency:'Auto Plus SN · Dakar',
     image:'clio.png',
@@ -108,6 +130,28 @@ export const vehicles = {
     desc:'Peugeot 3008 GT 2022 quasi neuf. Cuir Alcantara. Couleur : Rouge ultimate. Garantie 6 mois.',
     tags:['SUV · 2022','18 000 km','Essence','Auto'],
     reviews:[{name:'Sokhna A.',stars:'★★★★★',date:'17 mars 2026',text:'Magnifique ! MobileCar livraison le jour même.'}]
+  },
+  'vnt-6': {
+    emoji:'🚕', name:'Hyundai Tucson', agency:'Premium Cars Dakar',
+    image:'tucson.png',
+    price:13800000, priceLabel:'13 800 000', priceUnit:'F CFA', stars:'★★★★☆', rating:'4.5 (19 avis)',
+    specs:[{label:'Sièges',val:'5 places'},{label:'Portes',val:'5 portes'},{label:'Catégorie',val:'SUV'},{label:'Transmission',val:'Automatique'},{label:'Kilométrage',val:'24 000 km'},{label:'Classe',val:'Confort'}],
+    motor:[{label:'Carburant',val:'Essence'},{label:'Cylindrée',val:'1 600 cm³'},{label:'Conso.',val:'7,1 L/100km'},{label:'Puissance',val:'177 ch'}],
+    equip:['Caméra 360°','Apple CarPlay','Climatisation','Radar avant/arrière','Jantes 18"','ABS'],
+    desc:'Hyundai Tucson récente, très bien entretenue, idéale pour un usage familial confortable. Couleur : Blanc glacier.',
+    tags:['SUV · 2023','24 000 km','Essence','Auto'],
+    reviews:[{name:'Ibrahima L.',stars:'★★★★★',date:'9 mars 2026',text:'Très belle finition, voiture comme neuve.'}]
+  },
+  'vnt-7': {
+    emoji:'🚐', name:'Mercedes Sprinter', agency:'TransAfrica Location',
+    image:'mercedes sprinter.jpg',
+    price:21500000, priceLabel:'21 500 000', priceUnit:'F CFA', stars:'★★★★☆', rating:'4.4 (8 avis)',
+    specs:[{label:'Sièges',val:'15 places'},{label:'Portes',val:'4 portes'},{label:'Catégorie',val:'Minibus'},{label:'Transmission',val:'Manuelle'},{label:'Kilométrage',val:'41 000 km'},{label:'Classe',val:'Professionnel'}],
+    motor:[{label:'Carburant',val:'Diesel'},{label:'Cylindrée',val:'2 200 cm³'},{label:'Conso.',val:'9,5 L/100km'},{label:'Puissance',val:'163 ch'}],
+    equip:['Climatisation','Grand coffre','Banquettes confort','Bluetooth','ABS','ESP'],
+    desc:'Mercedes Sprinter en excellent état pour transport VIP, tourisme ou navette d’entreprise. Couleur : Noir métallisé.',
+    tags:['Minibus · 2021','41 000 km','Diesel','Manuelle'],
+    reviews:[{name:'Khadija R.',stars:'★★★★☆',date:'6 mars 2026',text:'Très bon véhicule pour activité professionnelle.'}]
   }
 };
 
@@ -155,4 +199,3 @@ export const agencyFleet = {
     {emoji:'🚙',name:'Toyota Land Cruiser',detail:'SUV · 2022',price:'Location & Vente',avail:true}
   ]
 };
-

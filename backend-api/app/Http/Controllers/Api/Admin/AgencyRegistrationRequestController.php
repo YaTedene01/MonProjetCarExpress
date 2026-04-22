@@ -78,6 +78,8 @@ class AgencyRegistrationRequestController extends Controller
         $existingAgencyFromRequest = $this->findExistingAgencyFromRequest($agencyRegistrationRequest);
 
         if ($existingAgencyFromRequest !== null) {
+            $this->syncAgencyBrandingFromRequest($existingAgencyFromRequest, $agencyRegistrationRequest);
+
             if ($agencyRegistrationRequest->status !== 'approved') {
                 $agencyRegistrationRequest->forceFill([
                     'status' => 'approved',
@@ -208,6 +210,47 @@ class AgencyRegistrationRequestController extends Controller
             'Demande agence enregistree avec succes.',
             new AgencyRegistrationRequestResource($agencyRegistrationRequest->fresh())
         );
+    }
+
+    private function syncAgencyBrandingFromRequest(Agency $agency, AgencyRegistrationRequest $agencyRegistrationRequest): void
+    {
+        $snapshot = is_array($agency->metadata) ? $agency->metadata : [];
+        $snapshot['source'] = $snapshot['source'] ?? 'agency_registration_request';
+        $snapshot['registration_request_id'] = $agencyRegistrationRequest->id;
+        $snapshot['registration_request_snapshot'] = [
+            'company' => $agencyRegistrationRequest->company,
+            'manager_name' => $agencyRegistrationRequest->manager_name,
+            'email' => $agencyRegistrationRequest->email,
+            'phone' => $agencyRegistrationRequest->phone,
+            'city' => $agencyRegistrationRequest->city,
+            'activity' => $agencyRegistrationRequest->activity,
+            'district' => $agencyRegistrationRequest->district,
+            'address' => $agencyRegistrationRequest->address,
+            'ninea' => $agencyRegistrationRequest->ninea,
+            'color' => $agencyRegistrationRequest->color,
+            'logo_url' => $agencyRegistrationRequest->logo_url,
+            'documents' => $agencyRegistrationRequest->documents,
+        ];
+
+        $agency->fill($this->filterColumns('agencies', [
+            'name' => $agencyRegistrationRequest->company ?: $agency->name,
+            'slug' => $agencyRegistrationRequest->company ? GenererReference::slug($agencyRegistrationRequest->company) : $agency->slug,
+            'activity' => $agencyRegistrationRequest->activity ?: ($agency->activity ?: 'Location et vente'),
+            'city' => $agencyRegistrationRequest->city ?: $agency->city,
+            'district' => $agencyRegistrationRequest->district ?: $agency->district,
+            'address' => $agencyRegistrationRequest->address ?: $agency->address,
+            'contact_phone' => $agencyRegistrationRequest->phone ?: $agency->contact_phone,
+            'contact_email' => $agencyRegistrationRequest->email ?: $agency->contact_email,
+            'ninea' => $agencyRegistrationRequest->ninea ?: $agency->ninea,
+            'color' => $agencyRegistrationRequest->color ?: ($agency->color ?: '#D40511'),
+            'logo_url' => $agencyRegistrationRequest->logo_url ?: $agency->logo_url,
+            'documents' => $agencyRegistrationRequest->documents ?: $agency->documents,
+            'metadata' => $snapshot,
+        ]));
+
+        if ($agency->isDirty()) {
+            $agency->save();
+        }
     }
 
     private function splitManagerName(?string $managerName): array

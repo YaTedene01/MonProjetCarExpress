@@ -10,6 +10,7 @@ use App\Repository\VehicleRepository;
 use App\Services\VehiculeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
 
 class VehicleController extends Controller
@@ -73,7 +74,7 @@ class VehicleController extends Controller
     public function store(UpsertVehicleRequest $request): JsonResponse
     {
         $vehicle = $this->vehiculeService->creerPourAgence(
-            $request->validated(),
+            $this->buildVehiclePayload($request),
             $request->user()->agency_id
         );
 
@@ -111,7 +112,37 @@ class VehicleController extends Controller
 
         return $this->successResponse(
             'Vehicule mis a jour avec succes.',
-            new VehicleResource($this->vehiculeService->mettreAJourPourAgence($vehicle, $request->validated()))
+            new VehicleResource($this->vehiculeService->mettreAJourPourAgence($vehicle, $this->buildVehiclePayload($request, $vehicle)))
         );
+    }
+
+    private function buildVehiclePayload(UpsertVehicleRequest $request, ?Vehicle $vehicle = null): array
+    {
+        $payload = $request->validated();
+        $existingGallery = collect($payload['gallery'] ?? ($vehicle?->gallery ?? []))
+            ->filter(fn ($item) => is_string($item) && trim($item) !== '')
+            ->values()
+            ->all();
+
+        unset($payload['gallery_files']);
+
+        $uploadedGallery = collect($request->file('gallery_files', []))
+            ->filter()
+            ->map(function ($file) use ($request): string {
+                $path = $file->storeAs(
+                    'vehicles/gallery',
+                    Str::uuid()->toString().'.'.$file->getClientOriginalExtension(),
+                    'public'
+                );
+
+                return '/storage/'.$path;
+            })
+            ->all();
+
+        if ($uploadedGallery !== [] || array_key_exists('gallery', $payload)) {
+            $payload['gallery'] = array_values(array_unique([...$existingGallery, ...$uploadedGallery]));
+        }
+
+        return $payload;
     }
 }

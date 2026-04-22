@@ -75,13 +75,19 @@ export async function openAgencyRequestDocumentAtUrl(downloadUrl) {
     const file = isDirectUrl(downloadUrl)
       ? await apiDownloadUrl(downloadUrl)
       : await apiDownload(downloadUrl);
-    const url = file.url;
 
     if (previewWindow) {
-      previewWindow.location.href = url;
+      previewWindow.document.open();
+      previewWindow.document.write(buildPreviewDocument(file));
+      previewWindow.document.close();
       previewWindow.focus();
     } else {
-      window.open(url, "_blank", "noopener,noreferrer");
+      const fallbackWindow = window.open("", "_blank");
+      if (fallbackWindow) {
+        fallbackWindow.document.open();
+        fallbackWindow.document.write(buildPreviewDocument(file));
+        fallbackWindow.document.close();
+      }
     }
 
     return file;
@@ -117,4 +123,67 @@ export async function loadAgencyRequestLogo(logoUrl) {
   }
 
   return isDirectUrl(logoUrl) ? apiDownloadUrl(logoUrl) : apiDownload(logoUrl);
+}
+
+function buildPreviewDocument(file) {
+  const safeTitle = escapeHtml(file.filename || "Document");
+  const url = file.url;
+  const mimeType = String(file.mimeType || "").toLowerCase();
+  const isImage = mimeType.startsWith("image/");
+  const isPdf = mimeType === "application/pdf";
+  const isText = mimeType.startsWith("text/");
+
+  let body = `
+    <div style="padding:24px;color:#17130f;font:16px/1.5 system-ui,sans-serif;">
+      <p>Apercu non disponible pour ce fichier.</p>
+      <p><a href="${url}" download="${safeTitle}">Telecharger le fichier</a></p>
+    </div>
+  `;
+
+  if (isImage) {
+    body = `
+      <div style="min-height:100vh;display:grid;place-items:center;background:#111;padding:24px;box-sizing:border-box;">
+        <img src="${url}" alt="${safeTitle}" style="max-width:100%;max-height:100vh;object-fit:contain;" />
+      </div>
+    `;
+  } else if (isPdf) {
+    body = `
+      <iframe
+        src="${url}"
+        title="${safeTitle}"
+        style="width:100vw;height:100vh;border:none;background:#2b2b2b;"
+      ></iframe>
+    `;
+  } else if (isText) {
+    body = `
+      <iframe
+        src="${url}"
+        title="${safeTitle}"
+        style="width:100vw;height:100vh;border:none;background:#fff;"
+      ></iframe>
+    `;
+  }
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${safeTitle}</title>
+    <style>
+      html, body { margin: 0; padding: 0; background: #111; }
+      * { box-sizing: border-box; }
+    </style>
+  </head>
+  <body>${body}</body>
+</html>`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }

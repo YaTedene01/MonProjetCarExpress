@@ -25,13 +25,13 @@ function formatDay(value) {
   }
 }
 
-export default function ChatPanel({ threads, accent, currentRole, currentName, emptyTitle, emptySubtitle, listTitle, onSend }) {
+export default function ChatPanel({ threads, accent, currentRole, currentName, emptyTitle, emptySubtitle, listTitle, onSend, initialThreadId }) {
   const { isMobile } = useResponsive();
   const sortedThreads = useMemo(
     () => [...threads].sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt)),
     [threads]
   );
-  const [selectedId, setSelectedId] = useState(sortedThreads[0]?.id || null);
+  const [selectedId, setSelectedId] = useState(initialThreadId || sortedThreads[0]?.id || null);
   const [draft, setDraft] = useState("");
 
   useEffect(() => {
@@ -39,10 +39,14 @@ export default function ChatPanel({ threads, accent, currentRole, currentName, e
       setSelectedId(null);
       return;
     }
+    if (initialThreadId && sortedThreads.find((thread) => thread.id === initialThreadId)) {
+      setSelectedId(initialThreadId);
+      return;
+    }
     if (!selectedId || !sortedThreads.find((thread) => thread.id === selectedId)) {
       setSelectedId(sortedThreads[0].id);
     }
-  }, [sortedThreads, selectedId]);
+  }, [sortedThreads, selectedId, initialThreadId]);
 
   const selectedThread = sortedThreads.find((thread) => thread.id === selectedId) || null;
 

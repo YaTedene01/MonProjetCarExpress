@@ -25,6 +25,22 @@ const vehicleImages = {
   '3008.png': peugeot3008Img,
 };
 
+function resolveVehicleImageSrc(image) {
+  if (!image) return null;
+  if (/^https?:\/\//i.test(image) || image.startsWith("blob:") || image.startsWith("/")) {
+    return image;
+  }
+  if (vehicleImages[image]) {
+    return vehicleImages[image];
+  }
+
+  try {
+    return new URL(`../assets/${image}`, import.meta.url).href;
+  } catch {
+    return null;
+  }
+}
+
 export const S = {
   loc: '#D40511', locLight: '#FFF0F0', locMid: '#F5C6C6',
   vnt: '#FFCC00', vntLight: '#FFFBE0', vntMid: '#FFE066', vntText: '#7A5C00',
@@ -457,7 +473,7 @@ export function StatCard({ label, value, sub, trend, accent }) {
       </div>
       <div style={{
         fontSize: isMobile ? 20 : 22, fontWeight: 600,
-        fontFamily: 'DM Mono, monospace', color: S.text, letterSpacing: '-0.5px',
+        color: S.text, letterSpacing: '-0.2px',
       }}>
         {value}
       </div>
@@ -484,11 +500,22 @@ export function CarCard({ vehicle, onClick, gridView, accent }) {
   const [hovered, setHovered] = useState(false);
   const haloColor = accent === S.loc ? 'rgba(212,5,17,0.12)' : 'rgba(255,204,0,0.18)';
   const borderHover = accent === S.loc ? S.locMid : S.vntMid;
-  const vehicleImage = vehicle.image && vehicleImages[vehicle.image];
+  const primaryImage = resolveVehicleImageSrc(vehicle.image);
+  const fallbackImage = resolveVehicleImageSrc(vehicle.fallbackImage);
+  const [vehicleImage, setVehicleImage] = useState(primaryImage);
+
+  useEffect(() => {
+    setVehicleImage(primaryImage);
+  }, [primaryImage]);
 
   const imageWidth = gridView ? '100%' : (isMobile ? 80 : 112);
   const imageHeight = gridView ? (isMobile ? 140 : 180) : (isMobile ? 70 : 92);
   const emojiSize = gridView ? (isMobile ? 30 : 36) : (isMobile ? 24 : 28);
+  const availabilityBadge = vehicle.availabilityBadge || "";
+  const isUnavailable = availabilityBadge === "Loue" || availabilityBadge === "Indisponible" || availabilityBadge === "Vendu";
+  const badgeStyles = isUnavailable
+    ? { background: 'rgba(212,5,17,0.10)', color: S.loc, border: `1px solid ${S.locMid}` }
+    : { background: 'rgba(26,122,46,0.10)', color: S.green, border: '1px solid rgba(26,122,46,0.18)' };
 
   return (
     <div
@@ -521,9 +548,39 @@ export function CarCard({ vehicle, onClick, gridView, accent }) {
         overflow: 'hidden',
       }}>
         {vehicleImage
-          ? <img src={vehicleImage} alt={vehicle.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ? (
+            <img
+              src={vehicleImage}
+              alt={vehicle.name}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              onError={() => {
+                if (fallbackImage && vehicleImage !== fallbackImage) {
+                  setVehicleImage(fallbackImage);
+                  return;
+                }
+
+                setVehicleImage(null);
+              }}
+            />
+          )
           : vehicle.emoji}
       </div>
+
+      {availabilityBadge ? (
+        <div style={{
+          position: 'absolute',
+          top: 12,
+          right: 12,
+          borderRadius: 999,
+          padding: '5px 10px',
+          fontSize: isMobile ? 9 : 10,
+          fontWeight: 700,
+          letterSpacing: '0.04em',
+          ...badgeStyles,
+        }}>
+          {availabilityBadge}
+        </div>
+      ) : null}
 
       <div style={{ flex: 1, minWidth: 0, width: gridView ? '100%' : 'auto' }}>
         <div style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: S.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: gridView ? 'normal' : 'nowrap' }}>
@@ -541,7 +598,7 @@ export function CarCard({ vehicle, onClick, gridView, accent }) {
 
       {!gridView && (
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: isMobile ? 14 : 15, fontWeight: 700, color: S.text, fontFamily: 'DM Mono, monospace' }}>{vehicle.priceLabel}</div>
+          <div style={{ fontSize: isMobile ? 14 : 15, fontWeight: 700, color: S.text }}>{vehicle.priceLabel}</div>
           <div style={{ fontSize: isMobile ? 10 : 11, color: S.text3, marginTop: 2 }}>{vehicle.priceUnit}</div>
         </div>
       )}
@@ -551,7 +608,7 @@ export function CarCard({ vehicle, onClick, gridView, accent }) {
           paddingTop: 8, marginTop: 2,
           display: 'flex', alignItems: 'baseline', gap: 4,
         }}>
-          <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 700, fontFamily: 'DM Mono, monospace' }}>{vehicle.priceLabel}</span>
+          <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 700 }}>{vehicle.priceLabel}</span>
           <span style={{ fontSize: isMobile ? 9 : 10, color: S.text3 }}>{vehicle.priceUnit}</span>
         </div>
       )}
@@ -602,14 +659,41 @@ export function SpecGrid({ items }) {
 
 // ── ReviewCard ────────────────────────────────────────────────────────
 export function ReviewCard({ review }) {
+  // Support backend format (client_name, rating, comment, created_at)
+  // and legacy format (name, stars, text, date)
+  const name = review.client_name || review.name || "Client anonyme";
+  const text = review.comment || review.text || "";
+
+  let date = review.date || "";
+  if (!date && review.created_at) {
+    try {
+      date = new Date(review.created_at).toLocaleDateString("fr-FR", {
+        year: "numeric", month: "short", day: "numeric",
+      });
+    } catch {
+      date = "";
+    }
+  }
+
+  let stars = review.stars || "";
+  if (!stars && review.rating != null) {
+    const n = Math.max(0, Math.min(5, Math.round(Number(review.rating))));
+    stars = "★".repeat(n) + "☆".repeat(5 - n);
+  }
+
   return (
     <div style={{ border: `1px solid ${S.border}`, borderRadius: 12, padding: 14, background: '#fff' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>{review.name}</div>
-        <div style={{ fontSize: 11, color: S.text3 }}>{review.date}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 30, height: 30, borderRadius: '50%', background: S.bg3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: S.text2, flexShrink: 0 }}>
+            {name.charAt(0).toUpperCase()}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>{name}</div>
+        </div>
+        <div style={{ fontSize: 11, color: S.text3 }}>{date}</div>
       </div>
-      <div style={{ fontSize: 13, color: '#f59e0b', marginBottom: 6 }}>{review.stars}</div>
-      <p style={{ fontSize: 13, color: S.text2, lineHeight: 1.55 }}>{review.text}</p>
+      <div style={{ fontSize: 14, color: '#f59e0b', marginBottom: 6, letterSpacing: 1 }}>{stars}</div>
+      {text ? <p style={{ fontSize: 13, color: S.text2, lineHeight: 1.55, margin: 0 }}>{text}</p> : null}
     </div>
   );
 }

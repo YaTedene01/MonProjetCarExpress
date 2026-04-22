@@ -4,6 +4,7 @@ namespace App\Enums;
 
 enum VehicleStatus: string
 {
+    case Pending = 'pending';
     case Available = 'available';
     case Rented = 'rented';
     case ForSale = 'for_sale';

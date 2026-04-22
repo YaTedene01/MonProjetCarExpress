@@ -36,6 +36,15 @@ class ReservationRepository
         return $reservation->load(['vehicle', 'client']);
     }
 
+    public function hasActiveReservationForVehicle(int $vehicleId, ?int $exceptReservationId = null): bool
+    {
+        return Reservation::query()
+            ->where('vehicle_id', $vehicleId)
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->when($exceptReservationId !== null, fn ($query) => $query->whereKeyNot($exceptReservationId))
+            ->exists();
+    }
+
     public function hasOverlap(int $vehicleId, string $pickupDate, string $returnDate): bool
     {
         return Reservation::query()
